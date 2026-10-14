@@ -1,5 +1,5 @@
 // Trip editor: trip details, days, stops (with locations), notes, and fixed departures.
-import { esc, ask, KIND_LABELS, TAG_LABELS, NOTE_LABELS, toMin, fromMin, addDays, weekdayOf, makeClock, DEFAULT_TZ } from './util.js';
+import { esc, ask, toast, KIND_LABELS, TAG_LABELS, NOTE_LABELS, toMin, fromMin, addDays, weekdayOf, makeClock, DEFAULT_TZ } from './util.js';
 import { openPlacePicker } from './placepicker.js';
 import { newStopId } from './store.js';
 
@@ -8,6 +8,42 @@ const TIMEZONES = (() => {
     return ['Asia/Kolkata', 'Asia/Dubai', 'Asia/Singapore', 'Asia/Bangkok', 'Asia/Tokyo', 'Europe/London', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles', 'Australia/Sydney', 'UTC'];
   }
 })();
+
+/* ---------- cover image ---------- */
+const COVER_MAX = 500 * 1024;
+const COVER_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const isCoverUrl = (u) => typeof u === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(u);
+
+const readDataUrl = (blob) => new Promise((resolve, reject) => {
+  const r = new FileReader();
+  r.onload = () => resolve(r.result);
+  r.onerror = () => reject(r.error);
+  r.readAsDataURL(blob);
+});
+
+// Images up to 500 KB are used as they are. Bigger ones (e.g. phone photos) are resized and
+// re-compressed as JPEG until they fit, so nobody has to shrink them by hand.
+async function prepareCover(file) {
+  if (!file.type.startsWith('image/')) throw new Error('Choose an image file (JPG, PNG or WebP).');
+  if (COVER_TYPES.includes(file.type) && file.size <= COVER_MAX) return readDataUrl(file);
+  let bmp;
+  try { bmp = await createImageBitmap(file); } catch { throw new Error('That image couldn\'t be opened. Try a JPG or PNG.'); }
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  for (const width of [1920, 1600, 1280, 1024, 800]) {
+    const scale = Math.min(1, width / bmp.width);
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    ctx.fillStyle = '#fff'; // JPEG has no transparency
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    for (const q of [0.85, 0.75, 0.65]) {
+      const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', q));
+      if (blob && blob.size <= COVER_MAX) return readDataUrl(blob);
+    }
+  }
+  throw new Error('That image is too detailed to fit in 500 KB. Try a smaller one.');
+}
 
 const blankStop = (start = '09:00') => ({ id: newStopId(), start, end: fromMin(toMin(start) + 60), kind: 'stop', title: '', note: '', place: null });
 
@@ -20,7 +56,9 @@ function setPath(obj, path, value) {
 }
 
 /**
- * opts: { isNew, canDelete, onSave(trip) → false if cancelled, onCancel(), onReload(), onDelete(), onDuplicate(trip) }
+ * opts: { isNew, canDelete, coverP (Promise of the current cover data URL or null),
+ *         onSave(trip, cover) → false if cancelled — cover is undefined (unchanged), a data URL, or null (removed),
+ *         onCancel(), onReload(), onDelete(), onDuplicate(trip) }
  */
 export function mountEditor(el, trip, opts) {
   const draft = structuredClone(trip);
@@ -29,6 +67,40 @@ export function mountEditor(el, trip, opts) {
   let errorStops = new Set();
   let changed = false;
   let noticeHtml = ''; // e.g. "Priya just saved changes" while you're editing
+  let coverSaved = null; // what the trip has now
+  let coverEdit; // undefined = unchanged, data URL = new image, null = back to the default
+  let coverBusy = false;
+  const coverNow = () => (coverEdit === undefined ? coverSaved : coverEdit);
+
+  function coverHtml() {
+    const has = !!coverNow();
+    return `
+      <div class="fld cover-fld">
+        <span>Cover image (optional)</span>
+        <div class="cover-pick">
+          <div class="cover-prev${has ? ' has' : ''}" role="img" aria-label="${has ? 'Cover image preview' : 'Default cover'}">${has ? '' : '<span>Default cover</span>'}</div>
+          <div class="cover-actions">
+            <button type="button" class="btn ghost small" data-a="cover-pick"${coverBusy ? ' disabled' : ''}>${coverBusy ? 'Preparing…' : has ? 'Change image' : 'Upload image'}</button>
+            ${has ? '<button type="button" class="btn ghost small" data-a="cover-remove">Use default</button>' : ''}
+          </div>
+        </div>
+        <small>JPG, PNG or WebP, up to 500 KB. Bigger photos are shrunk to fit automatically.</small>
+        <input type="file" accept="image/jpeg,image/png,image/webp,image/*" hidden data-cover-file>
+      </div>`;
+  }
+  // The image is set as a style after rendering, so the big data URL isn't re-parsed as HTML on every edit.
+  function paintCover() {
+    const prev = el.querySelector('.cover-prev');
+    const url = coverNow();
+    if (prev) prev.style.backgroundImage = isCoverUrl(url) ? `url("${url}")` : '';
+  }
+  function renderCover() {
+    const box = el.querySelector('.cover-fld');
+    if (!box) return;
+    box.outerHTML = coverHtml();
+    paintCover();
+  }
+  opts.coverP?.then((url) => { coverSaved = isCoverUrl(url) ? url : null; renderCover(); });
 
   const tzToday = () => makeClock(draft.timezone || DEFAULT_TZ).dateKey(new Date());
 
@@ -102,6 +174,7 @@ export function mountEditor(el, trip, opts) {
         <section class="ed-card">
           <label class="fld"><span>Trip name</span><input data-f="title" value="${esc(draft.title)}" maxlength="120" placeholder="e.g. Goa long weekend" required></label>
           <label class="fld"><span>Short description</span><input data-f="subtitle" value="${esc(draft.subtitle || '')}" maxlength="300" placeholder="Optional one-liner shown on the trip card"></label>
+          ${coverHtml()}
           <label class="fld"><span>Destination timezone</span>
             <select data-f="timezone">${tzs.map((z) => `<option${z === draft.timezone ? ' selected' : ''}>${esc(z)}</option>`).join('')}</select>
             <small>All times you enter are local times at the destination.</small>
@@ -121,6 +194,7 @@ export function mountEditor(el, trip, opts) {
           <button type="submit" class="btn">Save trip</button>
         </div>
       </form>`;
+    paintCover();
     window.scrollTo(0, y);
   }
 
@@ -155,7 +229,22 @@ export function mountEditor(el, trip, opts) {
   }
 
   /* ---------- events ---------- */
-  el.oninput = (e) => {
+  el.oninput = async (e) => {
+    if (e.type === 'change' && e.target.matches('[data-cover-file]')) {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      coverBusy = true;
+      renderCover();
+      try {
+        coverEdit = await prepareCover(file);
+        changed = true;
+      } catch (err) {
+        toast(err.message, 'bad');
+      }
+      coverBusy = false;
+      renderCover();
+      return;
+    }
     const f = e.target.dataset.f;
     if (!f) return;
     let v = e.target.value;
@@ -185,7 +274,7 @@ export function mountEditor(el, trip, opts) {
     btn.disabled = true;
     changed = false;
     try {
-      if ((await opts.onSave(draft)) === false) changed = true; // cancelled (e.g. after a conflict)
+      if ((await opts.onSave(draft, coverEdit)) === false) changed = true; // cancelled (e.g. after a conflict)
     } catch (err) {
       changed = true;
       errors = [err.message || 'Couldn\'t save.'];
@@ -254,6 +343,14 @@ export function mountEditor(el, trip, opts) {
         return;
       case 'duplicate':
         opts.onDuplicate(structuredClone(draft));
+        return;
+      case 'cover-pick':
+        el.querySelector('[data-cover-file]').click();
+        return;
+      case 'cover-remove':
+        coverEdit = null;
+        changed = true;
+        renderCover();
         return;
       default:
         return;

@@ -3,7 +3,7 @@ import {
   esc, distM, fmtDist, estimateTravel, directionsUrl, isHere, fmtDur, fmtHHMM, makeClock,
   THEMES, THEME_COLORS, TAG_LABELS, weekdayOf, shortDate, dayMonth, fmtRange,
 } from './util.js';
-import { nearbyPlaces, CATS } from './nearby.js';
+import { nearbyPlaces, forStop, intentFor, GENERAL, CATS } from './nearby.js';
 
 /* ============================================================
    Test mode (only active via URL; see README):
@@ -339,7 +339,7 @@ function renderStatus(ph, t) {
     <div class="progress" title="Day progress"><span style="width:${(st.progress * 100).toFixed(1)}%"></span></div>
     <div class="actions">
       <a class="btn" href="${directionsUrl(focus.place)}" target="_blank" rel="noopener">Directions</a>
-      <button class="btn ghost" type="button" data-nearby="${focus.id}">What to do nearby</button>
+      <button class="btn ghost" type="button" data-nearby="${focus.id}">${esc(intentFor(focus).button)}</button>
       <button class="btn ghost" type="button" data-done="${focus.id}">${st.cur ? 'Done / skip' : 'Skip this'}</button>
     </div>` : `
     <div class="now-title">That's everything for today</div>
@@ -400,7 +400,7 @@ function renderDay(t, ph) {
             ${state.selectedStop === s.id ? `
               <div class="stop-actions">
                 <a class="mini" href="${directionsUrl(s.place)}" target="_blank" rel="noopener">Directions</a>
-                <button class="mini" type="button" data-nearby="${s.id}">✨ What to do nearby</button>
+                <button class="mini" type="button" data-nearby="${s.id}">${intentFor(s).icon} ${esc(intentFor(s).button)}</button>
                 <button class="mini" type="button" data-done="${s.id}">${state.done.has(s.id) ? 'Undo done' : 'Mark done / skip'}</button>
               </div>` : ''}
           </div>
@@ -451,7 +451,7 @@ function renderMap(t) {
     const states = g.stops.map((s) => stopState(s, t));
     const cls = states.includes('now') ? 'now' : states.every((x) => x === 'done' || x === 'past') ? 'done' : '';
     const icon = L.divIcon({ className: '', html: `<div class="num-marker ${cls}" style="background:${color}">${i + 1}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
-    const popup = `<strong>${esc(g.place.name)}</strong><br>${g.stops.map((s) => `${esc(fmtHHMM(s.start))} · ${esc(s.title)}`).join('<br>')}<div class="pop-actions"><a href="${directionsUrl(g.place)}" target="_blank" rel="noopener">Directions</a><button type="button" class="link-btn" data-nearby="${g.stops[0].id}">What to do nearby</button></div>`;
+    const popup = `<strong>${esc(g.place.name)}</strong><br>${g.stops.map((s) => `${esc(fmtHHMM(s.start))} · ${esc(s.title)}`).join('<br>')}<div class="pop-actions"><a href="${directionsUrl(g.place)}" target="_blank" rel="noopener">Directions</a>${nearbyPopupBtn(g.stops)}</div>`;
     const m = L.marker([g.place.lat, g.place.lng], { icon }).bindPopup(popup).addTo(layer);
     g.stops.forEach((s) => { s._marker = m; });
     pts.push([g.place.lat, g.place.lng]);
@@ -471,6 +471,12 @@ function renderMap(t) {
   renderMe();
 }
 
+// One stop at this pin: search for what it's for. Several (check-in, dinner, breakfast…): the general list.
+function nearbyPopupBtn(stops) {
+  const one = stops.length === 1;
+  return `<button type="button" class="link-btn" data-nearby="${stops[0].id}"${one ? '' : ' data-nb-general'}>${esc(one ? intentFor(stops[0]).button : 'What to do nearby')}</button>`;
+}
+
 function renderMe() {
   if (!map) return;
   meLayer.clearLayers();
@@ -484,24 +490,29 @@ function renderMe() {
 /* ============================================================
    What to do nearby — panel under the map plus icon pins
    ============================================================ */
-// { stop, status: 'loading' | 'ok' | 'error', items, filter, error }
+// { stop, intent, status: 'loading' | 'ok' | 'error', items, filter, fellBack, error }
 let nearby = null;
 let nearbyReq = 0;
 const nearMarkers = new Map();
 
-async function openNearby(stopId) {
+// The stop's title and note decide what to look for: "Lunch in Fort" opens on lunch spots
+// closest to the stop, "Lonavala Market" on shops, anything else on sights first.
+async function openNearby(stopId, { general = false } = {}) {
   const stop = DAYS.flatMap((d) => d.stops).find((s) => s.id === stopId);
   if (!stop) return;
+  const intent = general ? GENERAL : intentFor(stop);
   const req = ++nearbyReq;
-  nearby = { stop, status: 'loading', items: [], filter: 'all' };
+  nearby = { stop, intent, status: 'loading', items: [], filter: intent.cat };
   map?.closePopup();
   renderNearby({ fit: true });
   // Phones show the map above the timeline: bring it into view.
   $('nearby').closest('.map-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
   try {
-    const items = await nearbyPlaces(stop.place);
+    const items = forStop(await nearbyPlaces(stop.place), intent);
     if (req !== nearbyReq) return;
-    nearby = { ...nearby, status: 'ok', items };
+    // Nothing of the kind mapped here (e.g. no bars): show everything rather than an empty list.
+    const fellBack = intent.cat !== 'all' && !items.some((x) => x.cat === intent.cat);
+    nearby = { ...nearby, status: 'ok', items, filter: fellBack ? 'all' : intent.cat, fellBack };
   } catch (e) {
     if (req !== nearbyReq) return;
     nearby = { ...nearby, status: 'error', error: e.message };
@@ -529,23 +540,29 @@ function renderNearby({ fit = false } = {}) {
     return;
   }
   el.hidden = false;
-  const { stop, status, items, filter } = nearby;
+  const { stop, intent, status, items, filter } = nearby;
   const shown = filter === 'all' ? items : items.filter((x) => x.cat === filter);
   const count = (c) => items.filter((x) => x.cat === c).length;
+  const near = intent === GENERAL ? 'What to do near' : `${intent.title} near`;
   const head = `
     <div class="nb-head">
-      <div><div class="nb-eyebrow">What to do nearby</div><strong>${esc(stop.place.name)}</strong></div>
+      <div>
+        <div class="nb-eyebrow">${intent.icon} ${esc(near)}</div>
+        <strong>${esc(stop.place.name)}</strong>
+        <div class="nb-for">For “${esc(stop.title)}” · ${esc(fmtHHMM(stop.start))}</div>
+      </div>
       <button class="icon-btn" type="button" data-nb-close aria-label="Close nearby places">✕</button>
     </div>`;
 
   if (status === 'loading') {
-    el.innerHTML = `${head}<p class="nb-msg">Finding things to do around here… This can take a few seconds.</p>`;
+    el.innerHTML = `${head}<p class="nb-msg">Finding ${esc(intent === GENERAL ? 'things to do' : intent.title.toLowerCase())} around here… This can take a few seconds.</p>`;
   } else if (status === 'error') {
     el.innerHTML = `${head}<p class="nb-msg">${esc(nearby.error)}</p><div class="nb-pad"><button class="mini" type="button" data-nb-retry>Try again</button></div>`;
   } else if (!items.length) {
     el.innerHTML = `${head}<p class="nb-msg">Nothing listed on OpenStreetMap within 3 km of this stop.</p>`;
   } else {
     el.innerHTML = `${head}
+      ${nearby.fellBack ? `<p class="nb-msg nb-fallback">No ${esc(intent.title.toLowerCase())} are listed on the map this close to the stop. Here's what else is around.</p>` : ''}
       <div class="nb-filters" role="tablist" aria-label="Filter nearby places">
         ${[['all', 'All', items.length], ...Object.entries(CATS).map(([k, c]) => [k, `${c.icon} ${c.label}`, count(k)])]
           .filter(([k, , n]) => k === 'all' || n)
@@ -558,11 +575,12 @@ function renderNearby({ fit = false } = {}) {
             <span class="nb-main">
               <span class="nb-name">${esc(x.name)}${x.famous ? ' <span class="nb-pop" title="Well known: has a Wikipedia entry">★ Popular</span>' : ''}</span>
               <span class="nb-meta">${esc(x.label)} · ${fmtDist(x.dist)} from stop</span>
+              ${x.hours && x.cat !== 'see' ? `<span class="nb-hours">🕒 ${esc(x.hours)}</span>` : ''}
             </span>
             <a class="mini" href="${directionsUrl(x)}" target="_blank" rel="noopener">Go</a>
           </li>`).join('')}
       </ul>
-      <p class="nb-foot">From OpenStreetMap. Well-known places first, then the closest. Check opening hours before you go.</p>`;
+      <p class="nb-foot">From OpenStreetMap. ${intent.cat === 'eat' || intent.cat === 'drink' ? 'Closest to the stop first.' : 'Well-known places first, then the closest.'} Check opening hours before you go.</p>`;
   }
 
   if (!map) return;
@@ -575,8 +593,10 @@ function renderNearby({ fit = false } = {}) {
   }
   if (!wasOpen) setTimeout(() => map.invalidateSize(), 0);
   if (fit) {
-    const pts = [[stop.place.lat, stop.place.lng], ...shown.map((x) => [x.lat, x.lng])];
-    setTimeout(() => (pts.length > 1 ? map.fitBounds(pts, { padding: [30, 30], maxZoom: 16 }) : map.setView(pts[0], 15)), 0);
+    // Meals zoom in on the closest handful, so the map shows the spots right around the stop.
+    const focus = intent.cat === filter && (filter === 'eat' || filter === 'drink') ? shown.slice(0, 6) : shown;
+    const pts = [[stop.place.lat, stop.place.lng], ...focus.map((x) => [x.lat, x.lng])];
+    setTimeout(() => (pts.length > 1 ? map.fitBounds(pts, { padding: [30, 30], maxZoom: 17 }) : map.setView(pts[0], 16)), 0);
   }
 }
 
@@ -650,9 +670,9 @@ function wire() {
     }
     const nb = e.target.closest('[data-nearby], [data-nb-close], [data-nb-retry], [data-nb-filter], [data-nb-item]');
     if (nb && !e.target.closest('a')) {
-      if (nb.dataset.nearby) openNearby(nb.dataset.nearby);
+      if (nb.dataset.nearby) openNearby(nb.dataset.nearby, { general: 'nbGeneral' in nb.dataset });
       else if ('nbClose' in nb.dataset) closeNearby();
-      else if ('nbRetry' in nb.dataset) openNearby(nearby.stop.id);
+      else if ('nbRetry' in nb.dataset) openNearby(nearby.stop.id, { general: nearby.intent === GENERAL });
       else if (nb.dataset.nbFilter) { nearby.filter = nb.dataset.nbFilter; renderNearby({ fit: true }); }
       else if (nb.dataset.nbItem) focusNearby(nb.dataset.nbItem);
       return;

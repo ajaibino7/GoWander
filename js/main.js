@@ -26,15 +26,45 @@ function showView(name) {
 }
 
 const fancyTitle = (t) => esc(t).replace(/ (\+|&amp;) /g, ' <em>$1</em> ');
-function setHero({ eyebrow = 'GoWander', title = 'Trips', sub = '', desc = '', nav = '' }) {
-  $('hero-eyebrow').textContent = eyebrow;
-  $('hero-title').innerHTML = fancyTitle(title);
-  $('hero-sub').textContent = sub;
+// trip: the trip this page is about, so its cover photo (if any) fills the header.
+// logo: the home page header — the GoWander logo centred in the sky as the page title.
+function setHero({ eyebrow = 'GoWander', title = 'Trips', sub = '', subHtml = '', desc = '', nav = '', trip = null, logo = false }) {
+  document.querySelector('.hero').classList.toggle('home', logo);
+  $('hero-eyebrow').textContent = logo ? '' : eyebrow;
+  heroTrip = trip;
+  applyCover();
+  $('hero-title').innerHTML = logo
+    ? '<span class="brand-glow"><img class="brand-logo" src="icons/logo.webp" alt="GoWander trip planner" width="900" height="624"></span>'
+    : fancyTitle(title);
+  if (subHtml) $('hero-sub').innerHTML = subHtml; else $('hero-sub').textContent = sub;
   $('hero-desc').textContent = desc;
   $('hero-desc').hidden = !desc;
   $('hero-nav').innerHTML = nav;
   document.title = title === 'Trips' ? 'GoWander' : `${title} · GoWander`;
 }
+/* ---------- trip cover photos in the header ---------- */
+const covers = new Map(); // trip id → image data URL
+let heroTrip = null;
+let shownCover = null;
+function applyCover() {
+  const url = (heroTrip && covers.get(heroTrip)) || null;
+  if (url === shownCover) return;
+  shownCover = url;
+  const hero = document.querySelector('.hero');
+  hero.classList.toggle('has-cover', !!url);
+  hero.style.setProperty('--cover', url ? `url("${url}")` : 'none');
+}
+// Keeps the header in step with the trip's cover while the page is open. Resolves with the first value.
+function watchCoverFor(id) {
+  return new Promise((resolve) => {
+    cloud.watchCover(id, (url) => {
+      if (url && /^data:image\/(jpeg|png|webp);base64,/.test(url)) covers.set(id, url); else covers.delete(id);
+      applyCover();
+      resolve(covers.get(id) || null);
+    }).then(keep, () => resolve(null));
+  });
+}
+
 const backLink = (href = '#/', label = 'All trips') => `<a class="hn-btn" href="${href}">‹ ${label}</a>`;
 const accountChip = () => (user
   ? `<a class="hn-btn" href="#/account" title="${esc(user.email)}">${user.photo ? `<img class="avatar-img" src="${esc(user.photo)}" alt="" referrerpolicy="no-referrer">` : '👤'} Account</a>`
@@ -86,20 +116,65 @@ async function shareOrCopy(url, text, copiedMsg) {
 /* ============================================================
    Home
    ============================================================ */
-function card(trip, i, { badges = '', actions = '' } = {}) {
+// Small line icons (inherit the text colour).
+const svg = (d) => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICON = {
+  cal: svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>'),
+  sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  pin: svg('<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'),
+  edit: svg('<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
+  users: svg('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>'),
+  plus: svg('<path d="M12 5v14M5 12h14"/>'),
+  upload: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/>'),
+};
+
+// Members as overlapping initials, coloured per person.
+const AVATAR_COLORS = ['#1f6f8b', '#e8704f', '#3c8d6b', '#b8801c', '#6a4fb3', '#c4553b'];
+function avatars(emails = []) {
+  if (!emails.length) return '';
+  const hue = (e) => AVATAR_COLORS[[...e].reduce((h, c) => h + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
+  const shown = emails.slice(0, 4);
+  return `<span class="avatars">${shown.map((e) => `<span class="av" style="background:${hue(e)}" title="${esc(e)}">${esc(e[0].toUpperCase())}</span>`).join('')}${emails.length > 4 ? `<span class="av more">+${emails.length - 4}</span>` : ''}</span>`;
+}
+
+function card(trip, i, { badges = '', actions = '', members = [] } = {}) {
   const st = tripStatus(trip);
   const stops = trip.days.reduce((n, d) => n + d.stops.length, 0);
   const first = trip.days[0]?.date, last = trip.days[trip.days.length - 1]?.date;
+  const [, , day] = (first || '').split('-');
+  const mon = first ? new Date(`${first}T12:00:00`).toLocaleString('en', { month: 'short' }) : '';
   return `
     <article class="trip-card theme-${THEMES[i % THEMES.length]}">
       <a class="tc-main" href="#/trip/${enc(trip.id)}">
-        <div class="tc-top"><span class="chip ${st.key}">${esc(st.label)}</span></div>
-        <h3>${esc(trip.title)}</h3>
-        <div class="tc-meta">${esc(fmtRange(first, last))} · ${trip.days.length} day${trip.days.length === 1 ? '' : 's'} · ${stops} stop${stops === 1 ? '' : 's'}</div>
-        ${trip.subtitle ? `<div class="tc-sub">${esc(trip.subtitle)}</div>` : ''}
+        <div class="tc-banner" data-cover-of="${esc(trip.id)}">
+          <svg class="tc-route" viewBox="0 0 300 110" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M18 92 C 80 92, 90 40, 150 50 S 230 18, 282 20" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="2" stroke-dasharray="5 6"/>
+            <circle cx="18" cy="92" r="4" fill="rgba(255,255,255,.8)"/><circle cx="150" cy="50" r="3" fill="rgba(255,255,255,.7)"/>
+          </svg>
+          ${first ? `<div class="tc-date"><b>${Number(day)}</b><span>${esc(mon)}</span></div>` : ''}
+          <span class="chip ${st.key}">${st.key === 'live' ? '<span class="live-dot"></span>' : ''}${esc(st.label)}</span>
+        </div>
+        <div class="tc-body">
+          <h3>${esc(trip.title)}</h3>
+          <div class="tc-meta">
+            <span>${ICON.cal}${esc(fmtRange(first, last))}</span>
+            <span>${ICON.sun}${trip.days.length} day${trip.days.length === 1 ? '' : 's'}</span>
+            <span>${ICON.pin}${stops} stop${stops === 1 ? '' : 's'}</span>
+          </div>
+          ${trip.subtitle ? `<div class="tc-sub">${esc(trip.subtitle)}</div>` : ''}
+        </div>
       </a>
-      <div class="tc-foot"><span class="badges">${badges}</span><span class="tc-actions">${actions}</span></div>
+      <div class="tc-foot"><span class="badges">${avatars(members)}${badges}</span><span class="tc-actions">${actions}</span></div>
     </article>`;
+}
+
+// Cards for trips whose cover was already loaded this session show it, without downloading
+// every trip's photo just to draw the list.
+function paintCardCovers() {
+  for (const b of document.querySelectorAll('[data-cover-of]')) {
+    const url = covers.get(b.dataset.coverOf);
+    if (url) { b.classList.add('has-cover'); b.style.backgroundImage = `url("${url}")`; }
+  }
 }
 
 function signInCard(message = '') {
@@ -137,9 +212,20 @@ document.addEventListener('toggle', (e) => {
 }, true);
 
 function showHome({ message = '' } = {}) {
+  const rows = user ? myTrips.map((e) => ({ ...e, st: tripStatus(e.trip) })).sort(byStatus) : [];
+  // The header points at what matters now: a trip in progress, else the next one.
+  const focus = rows.find((r) => r.st.key === 'live') || rows.find((r) => r.st.key === 'soon');
+  const pill = focus
+    ? `<a class="hero-pill${focus.st.key === 'live' ? ' live' : ''}" href="#/trip/${enc(focus.trip.id)}">
+        <span class="hp-dot"></span><span class="hp-k">${focus.st.key === 'live' ? 'Live now' : 'Up next'}</span>
+        <span class="hp-v">${esc(focus.trip.title)}${focus.st.key === 'soon' ? ` · ${esc(focus.st.label.toLowerCase())}` : ''}</span><span aria-hidden="true">→</span>
+      </a>`
+    : '';
   setHero({
+    logo: true,
     title: 'Trips',
-    sub: user ? `Signed in as ${user.email}` : 'Plan trips together and follow them live',
+    desc: 'Plan together · Travel smarter · Follow it live',
+    subHtml: `${pill}${user ? `<div class="hero-who">Signed in as ${esc(user.email)}</div>` : ''}`,
     nav: `<span></span>${accountChip()}`,
   });
   $('site-foot').textContent = cloud.emulatorMode ? 'Using local Firebase emulators.' : 'Trips are private to their members. Your location never leaves your device.';
@@ -156,31 +242,40 @@ function showHome({ message = '' } = {}) {
     return;
   }
 
-  const rows = myTrips.map((e) => ({ ...e, st: tripStatus(e.trip) })).sort(byStatus);
+  const live = rows.filter((r) => r.st.key === 'live').length;
+  const soon = rows.filter((r) => r.st.key === 'soon').length;
+  const summary = [`${rows.length} trip${rows.length === 1 ? '' : 's'}`, live && `${live} live now`, soon && `${soon} coming up`].filter(Boolean).join(' · ');
   $('view-home').innerHTML = `
-    <div class="home-actions">
-      <a class="btn" href="#/edit/new">+ New trip</a>
-      <button class="btn ghost" type="button" data-a="import">Import file</button>
+    <div class="home-head">
+      <div>
+        <h2 class="list-h">Your trips</h2>
+        <div class="home-sum">${esc(summary)}</div>
+      </div>
+      <div class="home-actions">
+        <button class="btn ghost" type="button" data-a="import">${ICON.upload} Import</button>
+        <a class="btn" href="#/edit/new">${ICON.plus} New trip</a>
+      </div>
     </div>
-    <h2 class="list-h">Your trips</h2>
     <div class="trip-list">
       ${rows.map(({ trip, meta }, i) => {
         const owner = meta.ownerUid === user.uid;
-        const n = meta.memberEmails.length;
         return card(trip, i, {
+          members: meta.memberEmails,
           badges: `${owner ? '<span class="badge pub">Owner</span>' : `<span class="badge local" title="${esc(meta.ownerEmail)}">Shared by ${esc(meta.ownerEmail.split('@')[0])}</span>`}
-            ${n > 1 ? `<span class="badge local">👥 ${n}</span>` : ''}
             ${meta.pending ? '<span class="badge dirty">Syncing…</span>' : ''}`,
-          actions: `<a class="mini" href="#/edit/${enc(trip.id)}">Edit</a><a class="mini" href="#/members/${enc(trip.id)}">Members</a>`,
+          actions: `<a class="icon-link" href="#/edit/${enc(trip.id)}" title="Edit trip" aria-label="Edit ${esc(trip.title)}">${ICON.edit}</a><a class="icon-link" href="#/members/${enc(trip.id)}" title="Members" aria-label="Members of ${esc(trip.title)}">${ICON.users}</a>`,
         });
       }).join('') || `
         <div class="empty">
-          <div class="empty-t">No trips yet</div>
-          <p>Create one, copy the sample, or import a trips file. Trips others share with you appear here too.</p>
+          <div class="empty-art" aria-hidden="true">🧭</div>
+          <div class="empty-t">Your next adventure starts here</div>
+          <p>Create a trip, copy the sample, or import a trips file. Trips friends share with you appear here too.</p>
+          <div class="home-actions center"><a class="btn" href="#/edit/new">${ICON.plus} Plan a trip</a></div>
         </div>`}
     </div>
     ${samplesSection(sampleCards)}
     <input type="file" id="import-file" accept=".json,application/json" hidden>`;
+  paintCardCovers();
   showView('home');
 }
 
@@ -197,7 +292,7 @@ function tripNav(trip, { sample = false, preview = false, meta = null } = {}) {
 }
 
 function showTripObject(trip, opts) {
-  setHero({ eyebrow: opts.sample ? 'Sample trip' : 'GoWander · live', title: trip.title, desc: trip.subtitle, nav: tripNav(trip, opts) });
+  setHero({ eyebrow: opts.sample ? 'Sample trip' : 'GoWander · live', title: trip.title, desc: trip.subtitle, nav: tripNav(trip, opts), trip: opts.sample || opts.preview ? null : trip.id });
   showView('trip');
   mountTrip(trip, { onDone: opts.onDone });
 }
@@ -240,6 +335,7 @@ async function showTrip(id) {
 
   // Done/skip marks are shared: ticking a stop shows up for every member.
   const onDone = (stopId, on) => cloud.setStopDone(user, id, stopId, on).catch((e) => toast(e.message, 'bad'));
+  watchCoverFor(id);
   let progressStarted = false;
   keep(await cloud.watchTrip(id, (entry) => {
     if (!entry) {
@@ -281,15 +377,24 @@ async function showEdit(id) {
     title: isNew ? 'New trip' : trip.title,
     sub: isNew ? 'Add days, then stops with times and places.' : (entry.meta.memberEmails.length > 1 ? 'Members see your changes as soon as you save.' : 'Changes sync to all your devices.'),
     nav: backLink(isNew ? '#/' : `#/trip/${enc(id)}`, isNew ? 'All trips' : 'Back to trip'),
+    trip: isNew ? null : id,
   });
   $('site-foot').textContent = 'Place search by OpenStreetMap Nominatim.';
   showView('edit');
+  // The plan is already saved when the cover goes up, so a failed cover is reported, not thrown:
+  // throwing would let "Save" run again and, for a new trip, create it twice.
+  const saveCover = async (tripId, cover) => {
+    if (cover === undefined) return;
+    try { await cloud.setCover(user, tripId, cover); } catch (e) { toast(`Trip saved, but the cover image wasn't: ${e.message}`, 'bad'); }
+  };
   editor = mountEditor($('view-edit'), trip, {
     isNew,
     canDelete: owner,
-    onSave: async (draft) => {
+    coverP: isNew ? Promise.resolve(null) : watchCoverFor(id),
+    onSave: async (draft, cover) => {
       if (isNew) {
         const newId = await cloud.createTrip(user, draft);
+        await saveCover(newId, cover);
         toast('Trip created', 'ok');
         location.hash = `#/trip/${enc(newId)}`;
         return;
@@ -306,6 +411,7 @@ async function showEdit(id) {
         }))) return false;
         await cloud.updateTrip(user, id, draft, baseMs, { force: true });
       }
+      await saveCover(id, cover);
       toast('Saved', 'ok');
       location.hash = `#/trip/${enc(id)}`;
     },
@@ -338,6 +444,7 @@ async function showEdit(id) {
 async function showMembers(id) {
   if (!user) { showHome({ message: 'Sign in to manage trip members.' }); return; }
   // Re-renders live as members are added or removed (the watcher is closed on navigation).
+  watchCoverFor(id);
   keep(await cloud.watchTrip(id, (entry) => {
     if (!entry) { toast('This trip was deleted, or you were removed from it.', 'bad'); location.replace('#/'); return; }
     renderMembers(entry);
@@ -347,7 +454,7 @@ async function showMembers(id) {
 function renderMembers({ trip, meta }) {
   const owner = meta.ownerUid === user.uid;
   const invite = `${location.origin}${location.pathname}#/trip/${enc(trip.id)}`;
-  setHero({ eyebrow: 'Trip members', title: trip.title, sub: `${meta.memberEmails.length} member${meta.memberEmails.length === 1 ? '' : 's'}`, nav: backLink(`#/trip/${enc(trip.id)}`, 'Back to trip') });
+  setHero({ eyebrow: 'Trip members', title: trip.title, sub: `${meta.memberEmails.length} member${meta.memberEmails.length === 1 ? '' : 's'}`, nav: backLink(`#/trip/${enc(trip.id)}`, 'Back to trip'), trip: trip.id });
   $('site-foot').textContent = 'Only members can open this trip. Access is enforced by Firebase security rules.';
   const members = [meta.ownerEmail, ...meta.memberEmails.filter((m) => m !== meta.ownerEmail)];
   const full = meta.memberEmails.length >= MAX_MEMBERS;
@@ -461,7 +568,7 @@ function showAccount() {
         <button class="btn ghost" type="button" data-a="import">Import file</button>
       </div>
     </section>
-    <p class="fine app-version">GoWander version ${esc(APP_VERSION)}</p>
+    <p class="fine app-version" title="Build ${esc(APP_VERSION)}">GoWander V${esc(RELEASE)}</p>
     <input type="file" id="import-file-s" accept=".json,application/json" hidden>`;
   showView('settings');
 }
@@ -657,6 +764,9 @@ document.addEventListener('keydown', (e) => {
 /* ============================================================
    Versioning: tell people when a newer GoWander has been deployed
    ============================================================ */
+// RELEASE is the version people see; bump it by hand when shipping. APP_VERSION is the build
+// hash written by the stamp script and is what the update check compares.
+const RELEASE = '1.0.1';
 const APP_VERSION = document.querySelector('meta[name="app-version"]')?.content || 'dev';
 
 let updateShown = false;

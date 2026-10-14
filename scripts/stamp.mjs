@@ -46,7 +46,7 @@ write('index.html', html);
 /* ---------- sw.js ---------- */
 let sw = read('sw.js');
 sw = replaceBlock(sw, 'version', `const VERSION = '${appVersion}';`, 'sw.js');
-const shell = ['./', './index.html', './manifest.webmanifest', './data/trips.json', './icons/icon.svg', ...files.map((f) => `./${v(f)}`)];
+const shell = ['./', './index.html', './manifest.webmanifest', './data/trips.json', './icons/favicon-64.png', './icons/logo.webp', ...files.map((f) => `./${v(f)}`)];
 sw = replaceBlock(sw, 'shell', `const SHELL = ${JSON.stringify(shell, null, 2).replace(/"/g, "'")};`, 'sw.js');
 write('sw.js', sw);
 

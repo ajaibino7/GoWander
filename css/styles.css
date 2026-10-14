@@ -95,6 +95,78 @@ button { font: inherit; color: inherit; }
   overflow: hidden;
 }
 .hero .skyline { position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: 70px; }
+/* A trip's cover photo replaces the default sunset artwork. The shading keeps white text readable
+   on any photo; the skyline silhouette is dropped but the curved edge stays. */
+.hero.has-cover {
+  background:
+    linear-gradient(180deg, rgba(8, 18, 36, .62) 0%, rgba(8, 18, 36, .32) 45%, rgba(8, 18, 36, .72) 100%),
+    var(--cover) center / cover no-repeat,
+    #0f2240;
+  padding-bottom: 88px;
+}
+.hero.has-cover .skyline path:first-child { display: none; }
+.hero.has-cover h1, .hero.has-cover .hero-sub, .hero.has-cover .hero-desc { text-shadow: 0 1px 8px rgba(0, 0, 0, .45); }
+/* ---------- Home header: a dawn coastline ----------
+   The logo is drawn for light backgrounds, so the home page gets a light morning sky
+   with layered peaks, hills and sea rolling into the page. Other pages keep the sunset. */
+.home-scene, .home-clouds { display: none; }
+.hero.home {
+  color: var(--navy);
+  background:
+    radial-gradient(ellipse 46% 52% at 50% 44%, rgba(255, 214, 150, .55) 0%, rgba(255, 214, 150, 0) 70%),
+    linear-gradient(180deg, #cfe7fb 0%, #e6f3fd 34%, #fff3e6 70%, #ffe3c9 100%);
+  padding-bottom: clamp(104px, 11vw, 150px);
+}
+.hero.home .skyline { display: none; }
+.hero.home .home-scene { display: block; position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: clamp(96px, 11.5vw, 160px); }
+.hero.home .home-clouds { display: block; position: absolute; inset: 0; pointer-events: none; }
+.cloud { position: absolute; fill: #fff; opacity: .9; filter: drop-shadow(0 6px 10px rgba(80, 120, 170, .12)); }
+.cloud.c1 { width: 150px; top: 14%; left: 6%; animation: drift 38s ease-in-out infinite alternate; }
+.cloud.c2 { width: 100px; top: 30%; right: 9%; opacity: .75; animation: drift 46s ease-in-out infinite alternate-reverse; }
+.cloud.c3 { width: 76px; top: 8%; right: 30%; opacity: .6; animation: drift 54s ease-in-out infinite alternate; }
+@media (max-width: 640px) { .cloud.c1 { width: 96px; left: -2%; } .cloud.c2 { width: 70px; top: 40%; } .cloud.c3 { display: none; } }
+
+.hero.home .hero-inner { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.hero.home .hero-nav { align-self: stretch; margin-bottom: 0; }
+.hero.home .eyebrow { display: none; }
+.hero.home h1 { margin: 0 0 8px; line-height: 0; }
+.hero.home .hero-desc {
+  order: 3; max-width: none; margin: 0 0 14px; opacity: 1;
+  font-size: 12px; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; color: #3b5578;
+}
+@media (max-width: 480px) { .hero.home .hero-desc { font-size: 11px; letter-spacing: .1em; } }
+.hero.home .hero-sub { order: 4; opacity: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.hero-who { font-size: 13px; color: #5a6e8c; }
+.hero.home .hn-btn {
+  color: var(--navy); background: rgba(255, 255, 255, .7); border-color: rgba(19, 41, 75, .14);
+  backdrop-filter: blur(8px); box-shadow: 0 2px 10px rgba(19, 41, 75, .08);
+}
+.hero.home .hn-btn:hover { background: #fff; }
+.brand-logo {
+  display: block; height: clamp(160px, 30vw, 250px); width: auto; max-width: 84vw; object-fit: contain;
+  filter: drop-shadow(0 10px 18px rgba(19, 41, 75, .16));
+  animation: rise .9s cubic-bezier(.2, .8, .2, 1) both;
+}
+/* "Live now / Up next" shortcut under the tagline. */
+.hero-pill {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%; text-decoration: none; color: var(--navy);
+  background: rgba(255, 255, 255, .78); border: 1px solid rgba(19, 41, 75, .1); border-radius: 999px;
+  padding: 7px 14px 7px 12px; font-size: 13px; backdrop-filter: blur(8px);
+  box-shadow: 0 6px 18px rgba(19, 41, 75, .1); transition: transform .15s, box-shadow .15s;
+}
+.hero-pill:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(19, 41, 75, .14); }
+.hp-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sea); flex: 0 0 auto; }
+.hero-pill.live .hp-dot { background: var(--coral); box-shadow: 0 0 0 0 rgba(232, 112, 79, .6); animation: pulse 1.8s infinite; }
+.hp-k { font-weight: 700; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--sea); }
+.hero-pill.live .hp-k { color: var(--coral-ink); }
+.hp-v { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+@keyframes rise { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes drift { from { transform: translateX(0); } to { transform: translateX(40px); } }
+@keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(232, 112, 79, 0); } 100% { box-shadow: 0 0 0 0 rgba(232, 112, 79, 0); } }
+@media (prefers-reduced-motion: reduce) {
+  .brand-logo, .cloud, .hero-pill.live .hp-dot { animation: none; }
+}
+}
 .hero-inner { position: relative; max-width: 1100px; margin: 0 auto; }
 .eyebrow { font-size: 11px; letter-spacing: .28em; text-transform: uppercase; opacity: .85; }
 /* The hero label carries the GoWander name, so it keeps its own capitalisation. */
@@ -309,7 +381,10 @@ button { font: inherit; color: inherit; }
 .nb-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 12px 12px 4px; }
 .nb-head strong { font-size: 15px; }
 .nb-eyebrow { font-size: 11px; font-weight: 600; color: var(--coral-ink); letter-spacing: .04em; }
+.nb-for { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .nb-msg { margin: 0; padding: 8px 12px 14px; font-size: 14px; color: var(--muted); }
+.nb-msg.nb-fallback { padding-bottom: 4px; font-size: 13px; }
+.nb-hours { font-size: 11px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nb-pad { padding: 0 12px 14px; }
 .nb-filters { display: flex; gap: 6px; padding: 6px 12px 8px; overflow-x: auto; scrollbar-width: none; }
 .nb-chip {

@@ -222,7 +222,29 @@ export async function leaveTrip(user, id) {
 export async function deleteTrip(id) {
   const { db, F } = await init();
   try { await commit(F.deleteDoc(progressRef(F, db, id))); } catch { /* no progress yet */ }
+  try { await commit(F.deleteDoc(coverRef(F, db, id))); } catch { /* no cover */ }
   await commit(F.deleteDoc(F.doc(db, 'trips', id)));
+}
+
+/* ============================================================
+   Cover photo — an optional image data URL in trips/{id}/media/cover, kept out of the trip
+   document so the plan stays small and lists don't download photos.
+   ============================================================ */
+const coverRef = (F, db, id) => F.doc(db, 'trips', id, 'media', 'cover');
+
+// cb(dataUrl | null) now and whenever a member changes it.
+export async function watchCover(id, cb) {
+  const { db, F } = await init();
+  return F.onSnapshot(coverRef(F, db, id), (snap) => cb(snap.data()?.data || null), () => cb(null));
+}
+
+// null removes it, so the trip goes back to the default artwork.
+export async function setCover(user, id, dataUrl) {
+  const { db, F } = await init();
+  const ref = coverRef(F, db, id);
+  await commit(dataUrl
+    ? F.setDoc(ref, { data: dataUrl, updatedBy: user.email, updatedAt: F.serverTimestamp() })
+    : F.deleteDoc(ref));
 }
 
 /* ============================================================

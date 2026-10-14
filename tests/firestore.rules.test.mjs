@@ -182,6 +182,35 @@ test('a removed member loses access to progress', async () => {
   await assertFails(tick(FRIEND));
 });
 
+/* ---------- cover image ---------- */
+const cover = (u) => doc(db(u), 'trips', 't1', 'media', 'cover');
+const img = (n = 1000) => `data:image/jpeg;base64,${'A'.repeat(n)}`;
+const setCover = (u, data = img()) => setDoc(cover(u), { data, ...stamp(u) });
+
+test('members can set, read and remove the cover', async () => {
+  await addFriend();
+  await assertSucceeds(setCover(FRIEND));
+  await assertSucceeds(getDoc(cover(OWNER)));
+  await assertSucceeds(setCover(OWNER, img(2000)));
+  await assertSucceeds(deleteDoc(cover(FRIEND)));
+});
+test('strangers cannot see or change the cover', async () => {
+  await setCover(OWNER);
+  await assertFails(getDoc(cover(STRANGER)));
+  await assertFails(setCover(STRANGER));
+  await assertFails(deleteDoc(cover(STRANGER)));
+});
+test('a near-500 KB cover is allowed, anything bigger is not', async () => {
+  await assertSucceeds(setCover(OWNER, img(683000)));
+  await assertFails(setCover(OWNER, img(700001)));
+});
+test('the cover must be an image data URL with nothing extra', async () => {
+  await assertFails(setCover(OWNER, 'https://example.com/x.jpg'));
+  await assertFails(setCover(OWNER, 'data:text/html;base64,PHNjcmlwdD4='));
+  await assertFails(setDoc(cover(OWNER), { data: img(), junk: 1, ...stamp(OWNER) }));
+  await assertFails(setDoc(doc(db(OWNER), 'trips', 't1', 'media', 'other'), { data: img(), ...stamp(OWNER) }));
+});
+
 /* ---------- deleting ---------- */
 test('only the owner can delete a trip', async () => {
   await addFriend();

@@ -70,6 +70,23 @@ service cloud.firestore {
           && request.resource.data.updatedAt == request.time;
         allow delete: if isOwner(trip());
       }
+
+      // Optional cover photo, kept apart from the plan so it never pushes the trip document toward
+      // Firestore's 1 MB limit. Any member can set or remove it. The app shrinks photos to ≤ 500 KB
+      // (≈ 683,000 characters as a base64 data URL).
+      match /media/{docId} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        allow read: if isMember(trip());
+        allow create, update: if docId == 'cover'
+          && isMember(trip())
+          && request.resource.data.keys().hasOnly(['data', 'updatedBy', 'updatedAt'])
+          && request.resource.data.data is string
+          && request.resource.data.data.size() <= 700000
+          && request.resource.data.data.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+')
+          && request.resource.data.updatedBy == myEmail()
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isMember(trip());
+      }
     }
 
     // A collaborator removing only themselves, touching nothing else.
