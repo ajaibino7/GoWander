@@ -150,6 +150,7 @@
   display: flex; align-items: flex-end; padding: 6px 8px; color: #fff; font-size: 11px; font-weight: 600;
 }
 .cover-prev.has { background-color: var(--surface-2); }
+.cover-prev span { text-shadow: 0 1px 4px rgba(0, 0, 0, .75); line-height: 1.25; }
 .cover-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .chk.big { font-size: 15px; font-weight: 600; color: var(--ink); cursor: pointer; padding: 2px 0; }
 .chk.big input[type="checkbox"] { width: 20px; height: 20px; }

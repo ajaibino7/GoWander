@@ -6,7 +6,7 @@
   <title>GoWander</title>
   <meta name="description" content="Plan trips day by day and follow them live with location-aware status.">
   <meta name="theme-color" content="#13294b">
-  <meta name="app-version" content="af803db2">
+  <meta name="app-version" content="c8ab4ff7">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/favicon-64.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -15,8 +15,8 @@
   <meta name="application-name" content="GoWander">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="css/styles.css?v=3ca5c8bdfa">
-  <link rel="stylesheet" href="css/app.css?v=e49065d0d2">
+  <link rel="stylesheet" href="css/styles.css?v=76e2c327de">
+  <link rel="stylesheet" href="css/app.css?v=cf18189c8b">
 </head>
 <body>
   <div id="sim-banner" class="sim-banner" hidden></div>
@@ -34,15 +34,16 @@
     </div>
     <svg class="home-scene" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true">
       <defs>
-        <linearGradient id="hs-far" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a9c8e6"/><stop offset="1" stop-color="#cfe1f2"/></linearGradient>
-        <linearGradient id="hs-mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f9a8c"/><stop offset="1" stop-color="#7fbfa6"/></linearGradient>
-        <linearGradient id="hs-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3fa7d6"/><stop offset="1" stop-color="#8fd3ec"/></linearGradient>
+        <linearGradient id="hs-far" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--hs-far1)"/><stop offset="1" style="stop-color:var(--hs-far2)"/></linearGradient>
+        <linearGradient id="hs-mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--hs-mid1)"/><stop offset="1" style="stop-color:var(--hs-mid2)"/></linearGradient>
+        <linearGradient id="hs-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--hs-sea1)"/><stop offset="1" style="stop-color:var(--hs-sea2)"/></linearGradient>
       </defs>
       <path fill="url(#hs-far)" d="M0 150 C40 140 60 120 100 118 C140 116 150 132 190 128 C240 122 250 80 300 76 C350 72 360 124 410 122 C460 120 480 92 530 90 C575 88 590 118 630 116 C670 114 680 86 720 84 C770 82 780 126 830 124 C880 122 880 80 930 78 C985 76 990 122 1040 120 C1090 118 1100 96 1140 94 C1185 92 1190 130 1240 128 C1290 126 1290 88 1340 86 C1390 84 1400 118 1440 120 V220 H0 Z"/>
       <path fill="url(#hs-mid)" d="M0 176 C110 150 210 158 320 142 C430 126 520 168 640 156 C760 144 850 122 980 146 C1100 168 1210 138 1320 150 C1380 156 1420 162 1440 160 V220 H0 Z"/>
       <path fill="url(#hs-sea)" d="M0 188 C240 178 480 194 720 186 C960 178 1200 192 1440 184 V220 H0 Z"/>
       <path fill="var(--bg)" d="M0 204 C240 196 480 212 720 203 C960 194 1200 210 1440 200 V220 H0 Z"/>
     </svg>
+    <a class="hero-credit" id="hero-credit" target="_blank" rel="noopener" hidden></a>
     <div class="hero-inner">
       <nav class="hero-nav" id="hero-nav" aria-label="Page"></nav>
       <div class="eyebrow" id="hero-eyebrow">GoWander</div>
@@ -95,11 +96,12 @@
   <script type="importmap">
   {
     "imports": {
+      "./js/autocover.js": "./js/autocover.js?v=43560ab3a9",
       "./js/cloud.js": "./js/cloud.js?v=2929a346fb",
-      "./js/editor.js": "./js/editor.js?v=5ae2c58ae0",
+      "./js/editor.js": "./js/editor.js?v=405d4d5e96",
       "./js/firebase-config.js": "./js/firebase-config.js?v=caeca71f59",
       "./js/live.js": "./js/live.js?v=fafc34d339",
-      "./js/main.js": "./js/main.js?v=85d0c03ce6",
+      "./js/main.js": "./js/main.js?v=2bd0e7491d",
       "./js/nearby.js": "./js/nearby.js?v=8656ebc47c",
       "./js/placepicker.js": "./js/placepicker.js?v=3594d48934",
       "./js/store.js": "./js/store.js?v=085676b855",
@@ -109,6 +111,6 @@
   }
   </script>
   <!-- /build:importmap -->
-  <script type="module" src="js/main.js?v=85d0c03ce6"></script>
+  <script type="module" src="js/main.js?v=2bd0e7491d"></script>
 </body>
 </html>

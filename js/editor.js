@@ -70,21 +70,24 @@ export function mountEditor(el, trip, opts) {
   let coverSaved = null; // what the trip has now
   let coverEdit; // undefined = unchanged, data URL = new image, null = back to the default
   let coverBusy = false;
+  let auto = null; // the destination photo used when nothing is uploaded
   const coverNow = () => (coverEdit === undefined ? coverSaved : coverEdit);
+  const autoUrl = () => (/^https:\/\/(upload|thumb)\.wikimedia\.org\//.test(auto?.hero || '') ? auto.hero.replace(/\/(\d+)px-([^/]+)$/, '/500px-$2') : '');
 
   function coverHtml() {
     const has = !!coverNow();
+    const label = auto ? `Photo of ${esc(auto.place)} · ${esc(auto.source)}` : 'Default cover';
     return `
       <div class="fld cover-fld">
         <span>Cover image (optional)</span>
         <div class="cover-pick">
-          <div class="cover-prev${has ? ' has' : ''}" role="img" aria-label="${has ? 'Cover image preview' : 'Default cover'}">${has ? '' : '<span>Default cover</span>'}</div>
+          <div class="cover-prev${has || auto ? ' has' : ''}" role="img" aria-label="${has ? 'Cover image preview' : label}">${has ? '' : `<span>${label}</span>`}</div>
           <div class="cover-actions">
             <button type="button" class="btn ghost small" data-a="cover-pick"${coverBusy ? ' disabled' : ''}>${coverBusy ? 'Preparing…' : has ? 'Change image' : 'Upload image'}</button>
-            ${has ? '<button type="button" class="btn ghost small" data-a="cover-remove">Use default</button>' : ''}
+            ${has ? `<button type="button" class="btn ghost small" data-a="cover-remove">${auto ? 'Use destination photo' : 'Use default'}</button>` : ''}
           </div>
         </div>
-        <small>JPG, PNG or WebP, up to 500 KB. Bigger photos are shrunk to fit automatically.</small>
+        <small>JPG, PNG or WebP, up to 500 KB. Bigger photos are shrunk to fit automatically. Without an upload, the trip shows a photo of its main destination.</small>
         <input type="file" accept="image/jpeg,image/png,image/webp,image/*" hidden data-cover-file>
       </div>`;
   }
@@ -92,7 +95,7 @@ export function mountEditor(el, trip, opts) {
   function paintCover() {
     const prev = el.querySelector('.cover-prev');
     const url = coverNow();
-    if (prev) prev.style.backgroundImage = isCoverUrl(url) ? `url("${url}")` : '';
+    if (prev) prev.style.backgroundImage = isCoverUrl(url) ? `url("${url}")` : autoUrl() ? `url("${autoUrl()}")` : '';
   }
   function renderCover() {
     const box = el.querySelector('.cover-fld');
@@ -101,6 +104,7 @@ export function mountEditor(el, trip, opts) {
     paintCover();
   }
   opts.coverP?.then((url) => { coverSaved = isCoverUrl(url) ? url : null; renderCover(); });
+  opts.autoP?.then((info) => { auto = info || null; renderCover(); });
 
   const tzToday = () => makeClock(draft.timezone || DEFAULT_TZ).dateKey(new Date());
 

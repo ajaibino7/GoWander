@@ -6,7 +6,7 @@
 // VERSION and SHELL are written by scripts/stamp.mjs — don't edit between the build markers.
 
 // build:version
-const VERSION = 'af803db2';
+const VERSION = 'c8ab4ff7';
 // /build:version
 const CACHE = `gowander-${VERSION}`;
 
@@ -18,13 +18,14 @@ const SHELL = [
   './data/trips.json',
   './icons/favicon-64.png',
   './icons/logo.webp',
-  './css/app.css?v=e49065d0d2',
-  './css/styles.css?v=3ca5c8bdfa',
+  './css/app.css?v=cf18189c8b',
+  './css/styles.css?v=76e2c327de',
+  './js/autocover.js?v=43560ab3a9',
   './js/cloud.js?v=2929a346fb',
-  './js/editor.js?v=5ae2c58ae0',
+  './js/editor.js?v=405d4d5e96',
   './js/firebase-config.js?v=caeca71f59',
   './js/live.js?v=fafc34d339',
-  './js/main.js?v=85d0c03ce6',
+  './js/main.js?v=2bd0e7491d',
   './js/nearby.js?v=8656ebc47c',
   './js/placepicker.js?v=3594d48934',
   './js/store.js?v=085676b855',

@@ -4,6 +4,7 @@ import * as store from './store.js';
 import * as cloud from './cloud.js';
 import { mountTrip, unmountTrip, setDone, sim } from './live.js';
 import { mountEditor } from './editor.js';
+import { autoCover, smallUrl, creditUrl } from './autocover.js';
 
 const $ = (id) => document.getElementById(id);
 const VIEWS = ['home', 'trip', 'edit', 'members', 'settings', 'import'];
@@ -34,7 +35,7 @@ function setHero({ eyebrow = 'GoWander', title = 'Trips', sub = '', subHtml = ''
   heroTrip = trip;
   applyCover();
   $('hero-title').innerHTML = logo
-    ? '<span class="brand-glow"><img class="brand-logo" src="icons/logo.webp" alt="GoWander trip planner" width="900" height="624"></span>'
+    ? '<img class="brand-logo" src="icons/logo.webp" alt="GoWander trip planner" width="900" height="624">'
     : fancyTitle(title);
   if (subHtml) $('hero-sub').innerHTML = subHtml; else $('hero-sub').textContent = sub;
   $('hero-desc').textContent = desc;
@@ -42,17 +43,37 @@ function setHero({ eyebrow = 'GoWander', title = 'Trips', sub = '', subHtml = ''
   $('hero-nav').innerHTML = nav;
   document.title = title === 'Trips' ? 'GoWander' : `${title} · GoWander`;
 }
-/* ---------- trip cover photos in the header ---------- */
-const covers = new Map(); // trip id → image data URL
+/* ---------- trip cover photos in the header ----------
+   An uploaded cover wins; otherwise a photo of the trip's main destination; otherwise the sunset. */
+const covers = new Map(); // trip id → uploaded image data URL
+const autoCovers = new Map(); // trip id → { hero, file, place, source } from autocover.js
+const isAutoUrl = (u) => /^https:\/\/(upload|thumb)\.wikimedia\.org\//.test(u || '');
 let heroTrip = null;
 let shownCover = null;
 function applyCover() {
-  const url = (heroTrip && covers.get(heroTrip)) || null;
+  const auto = heroTrip && !covers.has(heroTrip) ? autoCovers.get(heroTrip) : null;
+  const url = (heroTrip && covers.get(heroTrip)) || (isAutoUrl(auto?.hero) ? auto.hero : null);
+  const credit = $('hero-credit');
+  credit.hidden = !auto || !url;
+  if (auto && url) {
+    credit.textContent = `Photo: ${auto.place} · ${auto.source}`;
+    credit.href = creditUrl(auto);
+  }
   if (url === shownCover) return;
   shownCover = url;
   const hero = document.querySelector('.hero');
   hero.classList.toggle('has-cover', !!url);
   hero.style.setProperty('--cover', url ? `url("${url}")` : 'none');
+}
+// Looks up (or recalls) the destination photo for a trip, then refreshes the header and cards.
+function ensureAutoCover(trip) {
+  if (!trip?.id) return Promise.resolve(null);
+  return autoCover(trip).then((info) => {
+    if (info) autoCovers.set(trip.id, info); else autoCovers.delete(trip.id);
+    applyCover();
+    paintCardCovers();
+    return info;
+  }, () => null);
 }
 // Keeps the header in step with the trip's cover while the page is open. Resolves with the first value.
 function watchCoverFor(id) {
@@ -168,12 +189,18 @@ function card(trip, i, { badges = '', actions = '', members = [] } = {}) {
     </article>`;
 }
 
-// Cards for trips whose cover was already loaded this session show it, without downloading
-// every trip's photo just to draw the list.
+// Card banners: an uploaded cover already loaded this session (the list doesn't download every
+// trip's photo), else a small copy of the destination photo, else the coloured banner.
 function paintCardCovers() {
   for (const b of document.querySelectorAll('[data-cover-of]')) {
-    const url = covers.get(b.dataset.coverOf);
-    if (url) { b.classList.add('has-cover'); b.style.backgroundImage = `url("${url}")`; }
+    const id = b.dataset.coverOf;
+    const auto = covers.has(id) ? null : autoCovers.get(id);
+    const url = covers.get(id) || (isAutoUrl(auto?.hero) ? smallUrl(auto.hero) : null);
+    if (!url || b.dataset.painted === String(url.length) + url.slice(-60)) continue;
+    b.dataset.painted = String(url.length) + url.slice(-60);
+    b.classList.add('has-cover');
+    b.style.backgroundImage = `url("${url}")`;
+    if (auto) b.title = `Photo: ${auto.place} · ${auto.source}`;
   }
 }
 
@@ -238,6 +265,7 @@ function showHome({ message = '' } = {}) {
   if (!user) {
     $('view-home').innerHTML = `${signInCard(message)}
       ${samplesSection(sampleCards)}`;
+    samples.forEach(ensureAutoCover);
     showView('home');
     return;
   }
@@ -276,6 +304,8 @@ function showHome({ message = '' } = {}) {
     ${samplesSection(sampleCards)}
     <input type="file" id="import-file" accept=".json,application/json" hidden>`;
   paintCardCovers();
+  // Destination photos for the cards; looked up once per place, then remembered.
+  [...rows.map((r) => r.trip), ...samples].forEach(ensureAutoCover);
   showView('home');
 }
 
@@ -292,7 +322,8 @@ function tripNav(trip, { sample = false, preview = false, meta = null } = {}) {
 }
 
 function showTripObject(trip, opts) {
-  setHero({ eyebrow: opts.sample ? 'Sample trip' : 'GoWander · live', title: trip.title, desc: trip.subtitle, nav: tripNav(trip, opts), trip: opts.sample || opts.preview ? null : trip.id });
+  setHero({ eyebrow: opts.sample ? 'Sample trip' : 'GoWander · live', title: trip.title, desc: trip.subtitle, nav: tripNav(trip, opts), trip: opts.preview ? null : trip.id });
+  if (!opts.preview) ensureAutoCover(trip);
   showView('trip');
   mountTrip(trip, { onDone: opts.onDone });
 }
@@ -391,6 +422,7 @@ async function showEdit(id) {
     isNew,
     canDelete: owner,
     coverP: isNew ? Promise.resolve(null) : watchCoverFor(id),
+    autoP: isNew ? Promise.resolve(null) : ensureAutoCover(trip),
     onSave: async (draft, cover) => {
       if (isNew) {
         const newId = await cloud.createTrip(user, draft);
@@ -455,6 +487,7 @@ function renderMembers({ trip, meta }) {
   const owner = meta.ownerUid === user.uid;
   const invite = `${location.origin}${location.pathname}#/trip/${enc(trip.id)}`;
   setHero({ eyebrow: 'Trip members', title: trip.title, sub: `${meta.memberEmails.length} member${meta.memberEmails.length === 1 ? '' : 's'}`, nav: backLink(`#/trip/${enc(trip.id)}`, 'Back to trip'), trip: trip.id });
+  ensureAutoCover(trip);
   $('site-foot').textContent = 'Only members can open this trip. Access is enforced by Firebase security rules.';
   const members = [meta.ownerEmail, ...meta.memberEmails.filter((m) => m !== meta.ownerEmail)];
   const full = meta.memberEmails.length >= MAX_MEMBERS;
