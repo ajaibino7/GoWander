@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Trip Companion</title>
+  <meta name="description" content="Plan trips day by day and follow them live with location-aware status.">
+  <meta name="theme-color" content="#13294b">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="sim-banner" class="sim-banner" hidden></div>
+
+  <header class="hero">
+    <svg class="skyline" viewBox="0 0 800 120" preserveAspectRatio="none" aria-hidden="true">
+      <path fill="rgba(10,22,44,.45)" d="M0 120 V82 H30 V66 H48 V82 H70 V50 H86 V30 H96 V50 H110 V74 H140 V58 H160 V40 H170 V58 H190 V80 H220 V62 h10 V44 l12 -18 l12 18 V62 h10 V80 H290 V54 H312 V70 H340 V34 H352 V14 H362 V34 H374 V68 H400 V82 H430 V60 H460 V42 H470 V60 H500 V76 H530 V56 l18 -26 l18 26 V76 H600 V62 H624 V46 H640 V62 H660 V78 H700 V58 H720 V38 H732 V58 H760 V74 H800 V120 Z"/>
+      <path fill="var(--bg)" d="M0 120 V106 C120 98 220 112 330 104 C450 96 560 114 680 102 C730 98 770 104 800 100 V120 Z"/>
+    </svg>
+    <div class="hero-inner">
+      <nav class="hero-nav" id="hero-nav" aria-label="Page"></nav>
+      <div class="eyebrow" id="hero-eyebrow">Trip companion</div>
+      <h1 id="hero-title">Trips</h1>
+      <div class="hero-desc" id="hero-desc" hidden></div>
+      <div class="hero-sub" id="hero-sub"></div>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-home" class="view wrap-narrow" hidden></section>
+
+    <div id="view-trip" class="view wrap" hidden>
+      <div class="col-main">
+        <section class="status-card" id="status" aria-live="polite">
+          <div class="status-top">
+            <span class="pill" id="status-pill">Loading…</span>
+            <button class="loc-btn" id="loc-btn" type="button">
+              <span class="loc-dot" id="loc-dot"></span><span id="loc-label">Use my location</span>
+            </button>
+          </div>
+          <div id="status-body"></div>
+        </section>
+        <nav class="tabs" id="tabs" role="tablist" aria-label="Trip days"></nav>
+        <section class="day" id="day"></section>
+      </div>
+      <aside class="col-map">
+        <div class="map-card">
+          <div id="map" role="region" aria-label="Map of the day's stops"></div>
+          <div class="map-foot">
+            <button type="button" class="link-btn" id="fit-btn">Show all stops</button>
+            <button type="button" class="link-btn" id="me-btn" disabled>Centre on me</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <section id="view-edit" class="view wrap-narrow" hidden></section>
+    <section id="view-members" class="view wrap-narrow" hidden></section>
+    <section id="view-settings" class="view wrap-narrow" hidden></section>
+    <section id="view-import" class="view wrap-narrow" hidden></section>
+  </main>
+
+  <footer class="site-foot" id="site-foot"></footer>
+  <div id="modal" class="modal" hidden></div>
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

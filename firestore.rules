@@ -1,0 +1,63 @@
+rules_version = '2';
+
+// Trips are private to their members.
+//   • Anyone signed in with Google can create a trip; they become its owner.
+//   • Only members (owner + collaborators, by Google email) can read or edit it.
+//   • Only the owner can change the member list or delete the trip.
+//   • A collaborator can remove themselves ("leave trip").
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.email is string;
+    }
+    function myEmail() { return request.auth.token.email.lower(); }
+    function isMember(data) { return signedIn() && myEmail() in data.memberEmails; }
+    function isOwner(data) { return signedIn() && request.auth.uid == data.ownerUid; }
+
+    function validTrip(d) {
+      return d.keys().hasOnly(['title', 'subtitle', 'timezone', 'days', 'ownerUid', 'ownerEmail',
+                               'memberEmails', 'createdAt', 'updatedAt', 'updatedBy'])
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 120
+        && d.subtitle is string && d.subtitle.size() <= 300
+        && d.timezone is string && d.timezone.size() <= 64
+        && d.days is list && d.days.size() <= 60
+        && d.memberEmails is list && d.memberEmails.size() >= 1 && d.memberEmails.size() <= 20
+        && d.ownerEmail in d.memberEmails
+        && d.updatedBy == myEmail()
+        && d.updatedAt == request.time;
+    }
+
+    match /trips/{tripId} {
+      allow read: if isMember(resource.data);
+
+      allow create: if signedIn()
+        && validTrip(request.resource.data)
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.ownerEmail == myEmail()
+        && request.resource.data.memberEmails == [myEmail()]
+        && request.resource.data.createdAt == request.time;
+
+      // Members edit the plan; only the owner may change who the members are.
+      allow update: if isMember(resource.data)
+        && validTrip(request.resource.data)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && request.resource.data.ownerEmail == resource.data.ownerEmail
+        && request.resource.data.createdAt == resource.data.createdAt
+        && (request.resource.data.memberEmails == resource.data.memberEmails
+            || isOwner(resource.data)
+            || leaving());
+
+      allow delete: if isOwner(resource.data);
+    }
+
+    // A collaborator removing only themselves, touching nothing else.
+    function leaving() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberEmails', 'updatedAt', 'updatedBy'])
+        && !isOwner(resource.data)
+        && request.resource.data.memberEmails.toSet() == resource.data.memberEmails.toSet().difference([myEmail()].toSet());
+    }
+  }
+}

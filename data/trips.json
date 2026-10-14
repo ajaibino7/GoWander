@@ -1,0 +1,584 @@
+{
+  "version": 1,
+  "trips": [
+    {
+      "id": "mumbai-lonavala-2026",
+      "title": "Mumbai + Lonavala",
+      "subtitle": "Heritage streets of South Mumbai, misty Sahyadri viewpoints, Bandra evenings and a seaside farewell at Juhu.",
+      "timezone": "Asia/Kolkata",
+      "updatedAt": "2026-10-14T12:00:00.000Z",
+      "days": [
+        {
+          "date": "2026-10-17",
+          "title": "Fort, Colaba & Marine Drive",
+          "stops": [
+            {
+              "start": "11:00",
+              "end": "13:00",
+              "kind": "travel",
+              "title": "Arrive in Mumbai",
+              "note": "Travel to ISRA Comfort in Fort, leave bags and freshen up",
+              "place": {
+                "name": "ISRA Comfort, Fort",
+                "lat": 18.9345,
+                "lng": 72.8355,
+                "radius": 500,
+                "approx": true
+              }
+            },
+            {
+              "start": "13:00",
+              "end": "14:00",
+              "kind": "meal",
+              "title": "Lunch in Fort",
+              "place": {
+                "name": "Fort",
+                "lat": 18.933,
+                "lng": 72.8345,
+                "radius": 600
+              }
+            },
+            {
+              "start": "14:00",
+              "end": "14:30",
+              "kind": "stop",
+              "title": "CSMT Railway Station",
+              "note": "Iconic architecture and photos",
+              "place": {
+                "name": "CSMT Railway Station",
+                "lat": 18.93986,
+                "lng": 72.83552,
+                "radius": 300
+              }
+            },
+            {
+              "start": "14:45",
+              "end": "15:30",
+              "kind": "stop",
+              "title": "Flora Fountain & Horniman Circle",
+              "note": "Heritage walk",
+              "place": {
+                "name": "Flora Fountain",
+                "lat": 18.9325,
+                "lng": 72.8315,
+                "radius": 350
+              }
+            },
+            {
+              "start": "15:30",
+              "end": "16:15",
+              "kind": "stop",
+              "title": "Kala Ghoda",
+              "note": "Cafés, colonial architecture and street photography",
+              "place": {
+                "name": "Kala Ghoda",
+                "lat": 18.92846,
+                "lng": 72.8326,
+                "radius": 350
+              }
+            },
+            {
+              "start": "16:15",
+              "end": "17:00",
+              "kind": "stop",
+              "title": "Colaba Causeway",
+              "note": "Street shopping and snacks",
+              "place": {
+                "name": "Colaba Causeway",
+                "lat": 18.9195,
+                "lng": 72.8315,
+                "radius": 450
+              }
+            },
+            {
+              "start": "17:00",
+              "end": "18:15",
+              "kind": "stop",
+              "title": "Gateway of India & Taj Mahal Palace",
+              "note": "Your main sightseeing stop",
+              "tag": "must",
+              "place": {
+                "name": "Gateway of India",
+                "lat": 18.92197,
+                "lng": 72.83457,
+                "radius": 300
+              }
+            },
+            {
+              "start": "18:30",
+              "end": "19:30",
+              "kind": "meal",
+              "title": "Dinner or evening snacks",
+              "note": "Around Colaba",
+              "place": {
+                "name": "Colaba",
+                "lat": 18.921,
+                "lng": 72.832,
+                "radius": 700
+              }
+            },
+            {
+              "start": "20:00",
+              "end": "21:30",
+              "kind": "stop",
+              "title": "Marine Drive",
+              "note": "Skyline, sea breeze and the Queen's Necklace",
+              "tag": "must",
+              "place": {
+                "name": "Marine Drive",
+                "lat": 18.941,
+                "lng": 72.8233,
+                "radius": 900
+              }
+            },
+            {
+              "start": "22:00",
+              "end": "23:30",
+              "kind": "stay",
+              "title": "Return to Fort and rest",
+              "note": "Early start tomorrow for Lonavala",
+              "place": {
+                "name": "ISRA Comfort, Fort",
+                "lat": 18.9345,
+                "lng": 72.8355,
+                "radius": 500,
+                "approx": true
+              }
+            }
+          ],
+          "notes": [
+            {
+              "type": "star",
+              "title": "Don't miss",
+              "text": "Gateway of India, Taj Mahal Palace and Marine Drive after dark — the three highest-priority stops for Day 1."
+            }
+          ]
+        },
+        {
+          "date": "2026-10-18",
+          "title": "Mumbai → Khandala → Lonavala",
+          "stops": [
+            {
+              "start": "05:45",
+              "end": "06:15",
+              "kind": "travel",
+              "title": "Pick up the car near Fort",
+              "note": "Leave Mumbai early to beat the traffic",
+              "place": {
+                "name": "ISRA Comfort, Fort",
+                "lat": 18.9345,
+                "lng": 72.8355,
+                "radius": 500,
+                "approx": true
+              }
+            },
+            {
+              "start": "08:30",
+              "end": "09:15",
+              "kind": "stop",
+              "title": "Rajmachi Point, Khandala",
+              "note": "First mountain viewpoint, photos and tea",
+              "place": {
+                "name": "Rajmachi Point, Khandala",
+                "lat": 18.7675,
+                "lng": 73.383,
+                "radius": 700,
+                "approx": true
+              }
+            },
+            {
+              "start": "09:45",
+              "end": "10:30",
+              "kind": "stop",
+              "title": "Bhushi Dam",
+              "note": "Quick visit if accessible and the water flow is worthwhile",
+              "tag": "optional",
+              "place": {
+                "name": "Bhushi Dam",
+                "lat": 18.72251,
+                "lng": 73.39542,
+                "radius": 400
+              }
+            },
+            {
+              "start": "11:00",
+              "end": "11:45",
+              "kind": "stop",
+              "title": "Lion's Point",
+              "note": "Valley views and roadside snacks",
+              "place": {
+                "name": "Lion's Point",
+                "lat": 18.70411,
+                "lng": 73.38762,
+                "radius": 400
+              }
+            },
+            {
+              "start": "12:00",
+              "end": "13:00",
+              "kind": "stop",
+              "title": "Tiger Point",
+              "note": "The main attraction — panoramic views and group photos",
+              "tag": "key",
+              "place": {
+                "name": "Tiger Point",
+                "lat": 18.7075,
+                "lng": 73.372,
+                "radius": 700,
+                "approx": true
+              }
+            },
+            {
+              "start": "13:30",
+              "end": "14:30",
+              "kind": "meal",
+              "title": "Lunch in Lonavala town",
+              "place": {
+                "name": "Lonavala town",
+                "lat": 18.752,
+                "lng": 73.407,
+                "radius": 900
+              }
+            },
+            {
+              "start": "14:45",
+              "end": "15:30",
+              "kind": "stop",
+              "title": "Lonavala Lake",
+              "note": "A peaceful stop",
+              "tag": "optional",
+              "place": {
+                "name": "Lonavala Lake",
+                "lat": 18.75943,
+                "lng": 73.42238,
+                "radius": 500
+              }
+            },
+            {
+              "start": "15:30",
+              "end": "16:30",
+              "kind": "stop",
+              "title": "Lonavala Market",
+              "note": "Chikki, fudge and shopping",
+              "place": {
+                "name": "Lonavala Market",
+                "lat": 18.752,
+                "lng": 73.4065,
+                "radius": 500
+              }
+            },
+            {
+              "start": "16:30",
+              "end": "17:30",
+              "kind": "stay",
+              "title": "Airbnb check-in",
+              "place": {
+                "name": "Airbnb, Lonavala",
+                "lat": 18.753,
+                "lng": 73.407,
+                "radius": 1200,
+                "approx": true
+              }
+            },
+            {
+              "start": "19:30",
+              "end": "23:30",
+              "kind": "meal",
+              "title": "Dinner, music & a relaxed evening",
+              "note": "At the Airbnb",
+              "place": {
+                "name": "Airbnb, Lonavala",
+                "lat": 18.753,
+                "lng": 73.407,
+                "radius": 1200,
+                "approx": true
+              }
+            }
+          ],
+          "notes": [
+            {
+              "type": "star",
+              "title": "Recommendation",
+              "text": "Spend the most time at Tiger Point. Lion's Point and Tiger Point have similar scenery, so skip one if you're running late."
+            },
+            {
+              "type": "tip",
+              "title": "October note",
+              "text": "October usually brings clear mountain views rather than guaranteed waterfalls — Bhushi Dam is more impressive during the monsoon."
+            }
+          ]
+        },
+        {
+          "date": "2026-10-19",
+          "title": "Lonavala → Bandra → Mumbai nightlife",
+          "stops": [
+            {
+              "start": "07:30",
+              "end": "08:30",
+              "kind": "stay",
+              "title": "Wake up, breakfast & checkout",
+              "note": "Airbnb checkout",
+              "place": {
+                "name": "Airbnb, Lonavala",
+                "lat": 18.753,
+                "lng": 73.407,
+                "radius": 1200,
+                "approx": true
+              }
+            },
+            {
+              "start": "08:30",
+              "end": "11:30",
+              "kind": "travel",
+              "title": "Drive from Lonavala to Mumbai",
+              "note": "Allow extra time for traffic",
+              "place": {
+                "name": "Bandra West",
+                "lat": 19.0552,
+                "lng": 72.8305,
+                "radius": 1200,
+                "approx": true
+              }
+            },
+            {
+              "start": "11:30",
+              "end": "13:00",
+              "kind": "travel",
+              "title": "Return the rental car & drop luggage",
+              "note": "Return car if due; drop bags at your next stay",
+              "place": {
+                "name": "Bandra West",
+                "lat": 19.0552,
+                "lng": 72.8305,
+                "radius": 1200,
+                "approx": true
+              }
+            },
+            {
+              "start": "13:00",
+              "end": "14:00",
+              "kind": "meal",
+              "title": "Lunch around Bandra West",
+              "place": {
+                "name": "Bandra West",
+                "lat": 19.0552,
+                "lng": 72.8305,
+                "radius": 1200,
+                "approx": true
+              }
+            },
+            {
+              "start": "14:00",
+              "end": "15:30",
+              "kind": "stop",
+              "title": "Linking Road",
+              "note": "Shopping — sneakers, clothes and street stalls",
+              "place": {
+                "name": "Linking Road",
+                "lat": 19.06227,
+                "lng": 72.83555,
+                "radius": 600
+              }
+            },
+            {
+              "start": "15:30",
+              "end": "16:15",
+              "kind": "stop",
+              "title": "Mount Mary Basilica",
+              "note": "A peaceful heritage stop",
+              "tag": "optional",
+              "place": {
+                "name": "Mount Mary Basilica",
+                "lat": 19.04658,
+                "lng": 72.82264,
+                "radius": 250
+              }
+            },
+            {
+              "start": "16:30",
+              "end": "17:30",
+              "kind": "stop",
+              "title": "Bandra Fort",
+              "note": "Sea views and Sea Link photography",
+              "tag": "closing",
+              "place": {
+                "name": "Bandra Fort",
+                "lat": 19.04186,
+                "lng": 72.81838,
+                "radius": 300
+              }
+            },
+            {
+              "start": "17:30",
+              "end": "18:30",
+              "kind": "stop",
+              "title": "Bandstand Promenade",
+              "note": "Evening walk by the sea",
+              "place": {
+                "name": "Bandstand Promenade",
+                "lat": 19.0505,
+                "lng": 72.82141,
+                "radius": 500
+              }
+            },
+            {
+              "start": "19:00",
+              "end": "20:30",
+              "kind": "meal",
+              "title": "Dinner in Bandra West",
+              "place": {
+                "name": "Bandra West",
+                "lat": 19.0552,
+                "lng": 72.8305,
+                "radius": 1200,
+                "approx": true
+              }
+            },
+            {
+              "start": "20:30",
+              "end": "23:30",
+              "kind": "stop",
+              "title": "Pub, live music or café hopping",
+              "note": "Around Bandra West",
+              "place": {
+                "name": "Bandra West",
+                "lat": 19.0552,
+                "lng": 72.8305,
+                "radius": 1200,
+                "approx": true
+              }
+            }
+          ],
+          "notes": [
+            {
+              "type": "star",
+              "title": "Best experience",
+              "text": "Visit Bandra Fort before it closes, then walk along Bandstand. To see the Bandra–Worli Sea Link illuminated, take a separate drive later — there's no need to cross the bridge just for photos."
+            }
+          ]
+        },
+        {
+          "date": "2026-10-20",
+          "title": "Juhu, shopping & return train",
+          "stops": [
+            {
+              "start": "08:00",
+              "end": "09:00",
+              "kind": "stay",
+              "title": "Breakfast & checkout",
+              "note": "Or leave luggage at your stay",
+              "place": {
+                "name": "Bandra West",
+                "lat": 19.0552,
+                "lng": 72.8305,
+                "radius": 1200,
+                "approx": true
+              }
+            },
+            {
+              "start": "09:30",
+              "end": "11:00",
+              "kind": "stop",
+              "title": "Juhu Beach",
+              "note": "Morning walk, photos and seaside atmosphere",
+              "place": {
+                "name": "Juhu Beach",
+                "lat": 19.10265,
+                "lng": 72.82468,
+                "radius": 800
+              }
+            },
+            {
+              "start": "11:00",
+              "end": "12:00",
+              "kind": "meal",
+              "title": "Explore Juhu or early lunch",
+              "place": {
+                "name": "Juhu",
+                "lat": 19.097,
+                "lng": 72.829,
+                "radius": 1200
+              }
+            },
+            {
+              "start": "12:30",
+              "end": "15:30",
+              "kind": "stop",
+              "title": "Phoenix Marketcity, Kurla",
+              "note": "Shopping, cafés and entertainment",
+              "place": {
+                "name": "Phoenix Marketcity, Kurla",
+                "lat": 19.08628,
+                "lng": 72.88922,
+                "radius": 400
+              }
+            },
+            {
+              "start": "15:30",
+              "end": "16:30",
+              "kind": "stop",
+              "title": "Snacks & prepare to leave",
+              "note": "Collect luggage if needed",
+              "place": {
+                "name": "Phoenix Marketcity, Kurla",
+                "lat": 19.08628,
+                "lng": 72.88922,
+                "radius": 400
+              }
+            },
+            {
+              "start": "16:30",
+              "end": "17:00",
+              "kind": "travel",
+              "title": "Start towards LTT",
+              "note": "Adjust for your actual location",
+              "place": {
+                "name": "Lokmanya Tilak Terminus",
+                "lat": 19.06947,
+                "lng": 72.89198,
+                "radius": 400
+              }
+            },
+            {
+              "start": "18:00",
+              "end": "18:30",
+              "kind": "travel",
+              "title": "Arrive at Lokmanya Tilak Terminus",
+              "note": "Target arrival window",
+              "tag": "deadline",
+              "place": {
+                "name": "Lokmanya Tilak Terminus",
+                "lat": 19.06947,
+                "lng": 72.89198,
+                "radius": 400
+              }
+            },
+            {
+              "start": "19:30",
+              "end": "19:45",
+              "kind": "travel",
+              "title": "Train departure",
+              "tag": "must",
+              "place": {
+                "name": "Lokmanya Tilak Terminus",
+                "lat": 19.06947,
+                "lng": 72.89198,
+                "radius": 400
+              },
+              "departure": {
+                "buffer": 60
+              }
+            }
+          ],
+          "notes": [
+            {
+              "type": "warn",
+              "title": "Important",
+              "text": "Don't schedule another distant attraction late on Tuesday. Mumbai traffic is unpredictable — aim to be at LTT at least 60 minutes before departure."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
