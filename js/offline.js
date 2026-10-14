@@ -51,7 +51,8 @@ export async function makeOfflineReady(trip, days, onProgress = () => {}) {
   await step('Travel times', () => tripLegs(days));
   await step('Destination photo', async () => {
     const info = await autoCover(trip);
-    if (info) await Promise.all([savePhoto(info.hero), savePhoto(smallUrl(info.hero))]);
+    // The header uses the full photo on computers and a 960 px copy on phones; cards use a small one.
+    if (info) await Promise.all([info.hero, info.hero.replace(/\/(\d+)px-([^/]+)$/, '/960px-$2'), smallUrl(info.hero)].filter((u, i, all) => all.indexOf(u) === i).map(savePhoto));
   });
   // One place at a time: the places service is free and shared, and slow when busy.
   let n = 0;

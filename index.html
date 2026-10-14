@@ -6,7 +6,7 @@
   <title>GoWander</title>
   <meta name="description" content="Plan trips day by day and follow them live with location-aware status.">
   <meta name="theme-color" content="#13294b">
-  <meta name="app-version" content="a7b5f3e8">
+  <meta name="app-version" content="31f59e32">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/favicon-64.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -15,13 +15,13 @@
   <meta name="application-name" content="GoWander">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="css/styles.css?v=8b049819ca">
-  <link rel="stylesheet" href="css/app.css?v=99ffba6b58">
+  <link rel="stylesheet" href="css/styles.css?v=f2e0c79fbe">
+  <link rel="stylesheet" href="css/app.css?v=58151d1c9b">
 </head>
 <body>
   <div id="sim-banner" class="sim-banner" hidden></div>
 
-  <header class="hero">
+  <header class="hero home">
     <svg class="skyline" viewBox="0 0 800 120" preserveAspectRatio="none" aria-hidden="true">
       <path fill="rgba(10,22,44,.45)" d="M0 120 V82 H30 V66 H48 V82 H70 V50 H86 V30 H96 V50 H110 V74 H140 V58 H160 V40 H170 V58 H190 V80 H220 V62 h10 V44 l12 -18 l12 18 V62 h10 V80 H290 V54 H312 V70 H340 V34 H352 V14 H362 V34 H374 V68 H400 V82 H430 V60 H460 V42 H470 V60 H500 V76 H530 V56 l18 -26 l18 26 V76 H600 V62 H624 V46 H640 V62 H660 V78 H700 V58 H720 V38 H732 V58 H760 V74 H800 V120 Z"/>
       <path fill="var(--bg)" d="M0 120 V106 C120 98 220 112 330 104 C450 96 560 114 680 102 C730 98 770 104 800 100 V120 Z"/>
@@ -46,15 +46,33 @@
     <a class="hero-credit" id="hero-credit" target="_blank" rel="noopener" hidden></a>
     <div class="hero-inner">
       <nav class="hero-nav" id="hero-nav" aria-label="Page"></nav>
-      <div class="eyebrow" id="hero-eyebrow">GoWander</div>
-      <h1 id="hero-title">Trips</h1>
-      <div class="hero-desc" id="hero-desc" hidden></div>
+      <div class="eyebrow" id="hero-eyebrow"></div>
+      <h1 id="hero-title" data-html='<img class="brand-logo" src="icons/logo.webp" alt="GoWander trip planner" width="900" height="624">'><img class="brand-logo" src="icons/logo.webp" alt="GoWander trip planner" width="900" height="624"></h1>
+      <div class="hero-desc" id="hero-desc">Plan together · Travel smarter · Follow it live</div>
       <div class="hero-sub" id="hero-sub"></div>
     </div>
   </header>
 
   <main>
-    <section id="view-home" class="view wrap-narrow" hidden></section>
+    <section id="view-home" class="view wrap-narrow">
+      <div class="home-skel" aria-hidden="true">
+        <div class="sk-line w40"></div><div class="sk-line w25"></div>
+        <div class="trip-list"><div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div></div>
+      </div>
+    </section>
+    <script>
+      // The very first paint shows the home screen (logo header + placeholder cards) so nothing
+      // jumps when the app starts. A link straight to a trip or another page gets a plain header.
+      (function () {
+        if (/^#?\/?$/.test(location.hash)) return;
+        document.querySelector('.hero').classList.remove('home');
+        var t = document.getElementById('hero-title');
+        t.textContent = '';
+        t.removeAttribute('data-html');
+        document.getElementById('hero-desc').hidden = true;
+        document.getElementById('view-home').hidden = true;
+      })();
+    </script>
 
     <div id="view-trip" class="view wrap" hidden>
       <div class="col-main">
@@ -104,10 +122,10 @@
       "./js/cloud.js": "./js/cloud.js?v=007f8bcbfe",
       "./js/editor.js": "./js/editor.js?v=5b40e8f392",
       "./js/firebase-config.js": "./js/firebase-config.js?v=caeca71f59",
-      "./js/live.js": "./js/live.js?v=099883dea9",
-      "./js/main.js": "./js/main.js?v=7ca9f1e06c",
+      "./js/live.js": "./js/live.js?v=33d55cb787",
+      "./js/main.js": "./js/main.js?v=965d726ab6",
       "./js/nearby.js": "./js/nearby.js?v=8656ebc47c",
-      "./js/offline.js": "./js/offline.js?v=8a40b2d162",
+      "./js/offline.js": "./js/offline.js?v=73a89c5e7d",
       "./js/placepicker.js": "./js/placepicker.js?v=3594d48934",
       "./js/routing.js": "./js/routing.js?v=165c00c8ee",
       "./js/store.js": "./js/store.js?v=085676b855",
@@ -118,6 +136,6 @@
   }
   </script>
   <!-- /build:importmap -->
-  <script type="module" src="js/main.js?v=7ca9f1e06c"></script>
+  <script type="module" src="js/main.js?v=965d726ab6"></script>
 </body>
 </html>

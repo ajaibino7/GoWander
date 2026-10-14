@@ -113,7 +113,7 @@ button { font: inherit; color: inherit; }
 .hero.home {
   /* Morning palette; dark mode swaps these for a moonlit night below. */
   --hs-far1: #a9c8e6; --hs-far2: #cfe1f2; --hs-mid1: #4f9a8c; --hs-mid2: #7fbfa6; --hs-sea1: #3fa7d6; --hs-sea2: #8fd3ec;
-  --hs-ink: #3b5578; --hs-muted: #5a6e8c; --hs-glass: rgba(255, 255, 255, .78); --hs-glass-line: rgba(19, 41, 75, .12); --hs-cloud: #fff;
+  --hs-ink: #3b5578; --hs-muted: #5a6e8c; --hs-glass: rgba(255, 255, 255, .86); --hs-glass-line: rgba(19, 41, 75, .12); --hs-cloud: #fff;
   color: var(--navy);
   background:
     radial-gradient(ellipse 46% 52% at 50% 44%, rgba(255, 214, 150, .55) 0%, rgba(255, 214, 150, 0) 70%),
@@ -125,7 +125,7 @@ button { font: inherit; color: inherit; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .hero.home {
     --hs-far1: #2a4470; --hs-far2: #1d3358; --hs-mid1: #1d4b4a; --hs-mid2: #23605a; --hs-sea1: #1d5a86; --hs-sea2: #2d7aa6;
-    --hs-ink: #c8d7ef; --hs-muted: #93a6c4; --hs-glass: rgba(14, 28, 52, .62); --hs-glass-line: rgba(255, 255, 255, .14); --hs-cloud: #3a5078;
+    --hs-ink: #c8d7ef; --hs-muted: #93a6c4; --hs-glass: rgba(14, 28, 52, .78); --hs-glass-line: rgba(255, 255, 255, .14); --hs-cloud: #3a5078;
     color: #eef3fb;
     background:
       radial-gradient(ellipse 40% 48% at 50% 42%, rgba(150, 190, 255, .22) 0%, rgba(150, 190, 255, 0) 70%),
@@ -134,7 +134,7 @@ button { font: inherit; color: inherit; }
 }
 :root[data-theme="dark"] .hero.home {
   --hs-far1: #2a4470; --hs-far2: #1d3358; --hs-mid1: #1d4b4a; --hs-mid2: #23605a; --hs-sea1: #1d5a86; --hs-sea2: #2d7aa6;
-  --hs-ink: #c8d7ef; --hs-muted: #93a6c4; --hs-glass: rgba(14, 28, 52, .62); --hs-glass-line: rgba(255, 255, 255, .14); --hs-cloud: #3a5078;
+  --hs-ink: #c8d7ef; --hs-muted: #93a6c4; --hs-glass: rgba(14, 28, 52, .78); --hs-glass-line: rgba(255, 255, 255, .14); --hs-cloud: #3a5078;
   color: #eef3fb;
   background:
     radial-gradient(ellipse 40% 48% at 50% 42%, rgba(150, 190, 255, .22) 0%, rgba(150, 190, 255, 0) 70%),
@@ -167,7 +167,7 @@ button { font: inherit; color: inherit; }
 .hero.home .skyline { display: none; }
 .hero.home .home-scene { display: block; position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: clamp(96px, 11.5vw, 160px); }
 .hero.home .home-clouds { display: block; position: absolute; inset: 0; pointer-events: none; }
-.cloud { position: absolute; fill: var(--hs-cloud); opacity: .9; filter: drop-shadow(0 6px 10px rgba(80, 120, 170, .12)); }
+.cloud { position: absolute; fill: var(--hs-cloud); opacity: .9; }
 .cloud.c1 { width: 150px; top: 14%; left: 6%; animation: drift 38s ease-in-out infinite alternate; }
 .cloud.c2 { width: 100px; top: 30%; right: 9%; opacity: .75; animation: drift 46s ease-in-out infinite alternate-reverse; }
 .cloud.c3 { width: 76px; top: 8%; right: 30%; opacity: .6; animation: drift 54s ease-in-out infinite alternate; }
@@ -186,7 +186,7 @@ button { font: inherit; color: inherit; }
 .hero-who { font-size: 13px; color: var(--hs-muted); }
 .hero.home .hn-btn {
   color: inherit; background: var(--hs-glass); border-color: var(--hs-glass-line);
-  backdrop-filter: blur(8px); box-shadow: 0 2px 10px rgba(19, 41, 75, .08);
+  box-shadow: 0 2px 10px rgba(19, 41, 75, .08);
 }
 .hero.home .hn-btn:hover { filter: brightness(1.08); }
 .brand-logo {
@@ -198,7 +198,7 @@ button { font: inherit; color: inherit; }
 .hero-pill {
   display: inline-flex; align-items: center; gap: 8px; max-width: 100%; text-decoration: none; color: inherit;
   background: var(--hs-glass); border: 1px solid var(--hs-glass-line); border-radius: 999px;
-  padding: 7px 14px 7px 12px; font-size: 13px; backdrop-filter: blur(8px);
+  padding: 7px 14px 7px 12px; font-size: 13px;
   box-shadow: 0 6px 18px rgba(19, 41, 75, .1); transition: transform .15s, box-shadow .15s;
 }
 .hero-pill:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(19, 41, 75, .14); }
@@ -328,7 +328,7 @@ button { font: inherit; color: inherit; }
 .tab .tw { font-size: 11px; margin-top: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .day-wx {
   position: relative; display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; padding: 3px 10px; border-radius: 99px;
-  background: rgba(255, 255, 255, .18); font-size: 13px; font-weight: 600; backdrop-filter: blur(4px);
+  background: rgba(255, 255, 255, .22); font-size: 13px; font-weight: 600;
 }
 .day-wx.soft { font-weight: 500; opacity: .8; }
 .tl .m .m-wx { color: var(--muted); }

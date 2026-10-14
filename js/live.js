@@ -802,8 +802,12 @@ export function mountTrip(trip, { onDone = null } = {}) {
   $('site-foot').textContent = `Times are in trip time (${clock.label}). Your location stays on your device and is never uploaded.`;
 
   wire();
-  if (!map) initMap();
-  else setTimeout(() => { map.invalidateSize(); refitMap(); render(); }, 0);
+  if (!map) {
+    // Building the map (and loading its tiles) is the heaviest work here; let the screen's
+    // slide-in finish first so it stays smooth on phones.
+    const wait = matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 480;
+    setTimeout(() => { if (TRIP && !map) { initMap(); refitMap(); render(); } }, wait);
+  } else setTimeout(() => { map.invalidateSize(); refitMap(); render(); }, 0);
   render();
   timer ??= setInterval(render, TICK_MS);
   initLocation().then(render);

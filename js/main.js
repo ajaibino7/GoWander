@@ -19,31 +19,53 @@ let user = null;
 let samples = [];
 let myTrips = [];
 let myTripsReady = null, resolveMyTrips = () => {};
+let myTripsLoaded = false; // the first list arrived (until then the home page shows placeholders)
 let unsubMine = null;
 let cleanups = []; // live listeners for the current screen, closed on navigation
 const keep = (unsub) => { if (unsub) cleanups.push(unsub); };
 
 // How deep each screen sits, so moving deeper slides in from the right and going back from the left.
 const DEPTH = { home: 0, settings: 1, import: 1, trip: 1, edit: 2, members: 2, checklist: 2, expenses: 2 };
+let visit = 0; // counts screen changes, so each list rises in once per visit
 function showView(name) {
   const prev = current;
   for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
   current = name;
-  if (prev !== name) animateIn(name, prev && DEPTH[name] < DEPTH[prev] ? 'back' : 'forward');
+  if (prev === name) return;
+  visit++;
+  // The first screen after loading is already on show (index.html paints it), so it doesn't slide.
+  if (prev) animateIn(name, DEPTH[name] < DEPTH[prev] ? 'back' : 'forward');
 }
 
-// Plays the screen's entrance (styles in app.css → Motion). "entering" also lets its lists rise in,
-// then it's removed so later live refreshes don't replay anything.
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+// Slides the whole screen and the header text in (styles in app.css → Motion). These elements stay
+// in place while their content is redrawn, so a redraw mid-slide doesn't restart anything.
 let enterTimer = null;
 function animateIn(name, dir) {
+  if (reduceMotion.matches) return;
   const els = [$(`view-${name}`), document.querySelector('.hero-inner')];
   for (const el of els) {
-    el.classList.remove('enter-forward', 'enter-back', 'entering');
+    el.classList.remove('enter-forward', 'enter-back');
     void el.offsetWidth; // restart the animation
-    el.classList.add(`enter-${dir}`, 'entering');
+    el.classList.add(`enter-${dir}`);
   }
   clearTimeout(enterTimer);
-  enterTimer = setTimeout(() => els.forEach((el) => el.classList.remove('enter-forward', 'enter-back', 'entering')), 900);
+  enterTimer = setTimeout(() => els.forEach((el) => el.classList.remove('enter-forward', 'enter-back')), 700);
+}
+
+// Lets a list's items rise in one after another — once per visit to the screen. Done with the Web
+// Animations API on the items present now, so redraws afterwards never replay or restart it.
+function reveal(view, key, selector) {
+  if (reduceMotion.matches || !view) return;
+  const mark = `${visit}:${key}`;
+  if ((view.dataset.revealed || '').split(' ').includes(mark)) return;
+  const items = [...view.querySelectorAll(selector)];
+  if (!items.length) return; // nothing loaded yet: wait for the real content
+  view.dataset.revealed = `${(view.dataset.revealed || '').split(' ').filter((m) => m.startsWith(`${visit}:`)).join(' ')} ${mark}`.trim();
+  items.slice(0, 12).forEach((el, i) => el.animate(
+    [{ opacity: 0, transform: 'translate3d(0, 16px, 0) scale(.985)' }, { opacity: 1, transform: 'none' }],
+    { duration: 560, delay: 60 + i * 45, easing: 'cubic-bezier(.32, .72, 0, 1)', fill: 'backwards' },
+  ));
 }
 // iOS Safari only shows :active (the press-down effect) when the page listens for touches.
 document.addEventListener('touchstart', () => {}, { passive: true });
@@ -51,18 +73,28 @@ document.addEventListener('touchstart', () => {}, { passive: true });
 const fancyTitle = (t) => esc(t).replace(/ (\+|&amp;) /g, ' <em>$1</em> ');
 // trip: the trip this page is about, so its cover photo (if any) fills the header.
 // logo: the home page header — the GoWander logo centred in the sky as the page title.
+// Firebase calls back several times as a screen loads (cached copy, server copy, sync state), and
+// most of those produce the same screen. Touching the DOM anyway restarts animations and makes
+// images flicker, so these only write when the content actually changed.
+function setHTML(el, html) {
+  if (el.dataset.html === html) return false;
+  el.innerHTML = html;
+  el.dataset.html = html;
+  return true;
+}
+function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
+
+const LOGO = '<img class="brand-logo" src="icons/logo.webp" alt="GoWander trip planner" width="900" height="624">';
 function setHero({ eyebrow = 'GoWander', title = 'Trips', sub = '', subHtml = '', desc = '', nav = '', trip = null, logo = false }) {
   document.querySelector('.hero').classList.toggle('home', logo);
-  $('hero-eyebrow').textContent = logo ? '' : eyebrow;
+  setText($('hero-eyebrow'), logo ? '' : eyebrow);
   heroTrip = trip;
   applyCover();
-  $('hero-title').innerHTML = logo
-    ? '<img class="brand-logo" src="icons/logo.webp" alt="GoWander trip planner" width="900" height="624">'
-    : fancyTitle(title);
-  if (subHtml) $('hero-sub').innerHTML = subHtml; else $('hero-sub').textContent = sub;
-  $('hero-desc').textContent = desc;
+  setHTML($('hero-title'), logo ? LOGO : fancyTitle(title));
+  setHTML($('hero-sub'), subHtml || esc(sub));
+  setText($('hero-desc'), desc);
   $('hero-desc').hidden = !desc;
-  $('hero-nav').innerHTML = nav;
+  setHTML($('hero-nav'), nav);
   document.title = title === 'Trips' ? 'GoWander' : `${title} · GoWander`;
 }
 /* ---------- trip cover photos in the header ----------
@@ -74,7 +106,9 @@ let heroTrip = null;
 let shownCover = null;
 function applyCover() {
   const auto = heroTrip && !covers.has(heroTrip) ? autoCovers.get(heroTrip) : null;
-  const url = (heroTrip && covers.get(heroTrip)) || (isAutoUrl(auto?.hero) ? auto.hero : null);
+  // Phones get a 960 px copy of the destination photo: a quarter of the pixels to decode.
+  const autoUrl = isAutoUrl(auto?.hero) ? (innerWidth < 700 ? auto.hero.replace(/\/(\d+)px-([^/]+)$/, '/960px-$2') : auto.hero) : null;
+  const url = (heroTrip && covers.get(heroTrip)) || autoUrl;
   const credit = $('hero-credit');
   credit.hidden = !auto || !url;
   if (auto && url) {
@@ -290,8 +324,8 @@ function showHome({ message = '' } = {}) {
   })).join('');
 
   if (!user) {
-    $('view-home').innerHTML = `${signInCard(message)}
-      ${samplesSection(sampleCards)}`;
+    setHTML($('view-home'), `${signInCard(message)}
+      ${samplesSection(sampleCards)}`);
     samples.forEach(ensureAutoCover);
     showView('home');
     return;
@@ -300,7 +334,13 @@ function showHome({ message = '' } = {}) {
   const live = rows.filter((r) => r.st.key === 'live').length;
   const soon = rows.filter((r) => r.st.key === 'soon').length;
   const summary = [`${rows.length} trip${rows.length === 1 ? '' : 's'}`, live && `${live} live now`, soon && `${soon} coming up`].filter(Boolean).join(' · ');
-  $('view-home').innerHTML = `
+  // Until the trip list has loaded, placeholder cards (not a "No trips yet" flash).
+  if (!myTripsLoaded) {
+    setHTML($('view-home'), HOME_SKELETON);
+    showView('home');
+    return;
+  }
+  setHTML($('view-home'), `
     <div class="home-head">
       <div>
         <h2 class="list-h">Your trips</h2>
@@ -330,12 +370,20 @@ function showHome({ message = '' } = {}) {
         </div>`}
     </div>
     ${samplesSection(sampleCards)}
-    <input type="file" id="import-file" accept=".json,application/json" hidden>`;
+    <input type="file" id="import-file" accept=".json,application/json" hidden>`);
   paintCardCovers();
   // Destination photos for the cards; looked up once per place, then remembered.
   [...rows.map((r) => r.trip), ...samples].forEach(ensureAutoCover);
   showView('home');
+  reveal($('view-home'), 'cards', '.trip-list > .trip-card, .empty');
 }
+
+// Shown in index.html before the app starts, and while the trip list loads.
+const HOME_SKELETON = `
+  <div class="home-skel" aria-hidden="true">
+    <div class="sk-line w40"></div><div class="sk-line w25"></div>
+    <div class="trip-list"><div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div></div>
+  </div>`;
 
 /* ============================================================
    Trip (live view)
@@ -568,16 +616,17 @@ function paintChecklist(items) {
     const done = mine.filter((x) => x.done).length;
     card.querySelector('.cl-count').textContent = mine.length ? `${done} of ${mine.length} ${CHECKLISTS[list].noun}` : '';
     card.querySelector('.cl-bar span').style.width = mine.length ? `${(done / mine.length) * 100}%` : '0';
-    card.querySelector('.cl-items').innerHTML = mine.map((x) => `
+    setHTML(card.querySelector('.cl-items'), mine.map((x) => `
       <li class="cl-item${x.done ? ' done' : ''}${x.done && Date.now() - (justTicked.get(x.id) || 0) < 800 ? ' pop' : ''}">
         <label><input type="checkbox" data-toggle="${esc(x.id)}"${x.done ? ' checked' : ''}><span class="cl-text">${esc(x.text)}</span></label>
         ${x.done && x.doneBy ? `<span class="cl-by" title="${esc(x.doneBy)}">✓ ${esc(nameOf(x.doneBy))}</span>` : ''}
         <button class="icon-btn" type="button" data-del="${esc(x.id)}" title="Remove" aria-label="Remove ${esc(x.text)}">✕</button>
-      </li>`).join('') || '<li class="cl-empty muted small">Nothing here yet. Add your own, or pick from the ideas below.</li>';
+      </li>`).join('') || '<li class="cl-empty muted small">Nothing here yet. Add your own, or pick from the ideas below.</li>');
     const have = new Set(mine.map((x) => x.text.toLowerCase()));
     const ideas = CHECKLISTS[list].ideas.filter((t) => !have.has(t.toLowerCase())).slice(0, 8);
-    card.querySelector('.cl-ideas').innerHTML = ideas.map((t) => `<button class="chip-btn" type="button" data-idea="${esc(t)}">+ ${esc(t)}</button>`).join('');
+    setHTML(card.querySelector('.cl-ideas'), ideas.map((t) => `<button class="chip-btn" type="button" data-idea="${esc(t)}">+ ${esc(t)}</button>`).join(''));
   }
+  reveal($('view-checklist'), 'items', '.cl-item');
 }
 
 /* ---------- expenses ---------- */
@@ -688,7 +737,7 @@ async function showExpenses(id) {
     const by = balances(expenses);
     const me = user.email;
     // Summary per currency.
-    $('ex-summary').innerHTML = by.size ? [...by].map(([cur, c]) => {
+    setHTML($('ex-summary'), by.size ? [...by].map(([cur, c]) => {
       const mine = round2(c.bal.get(me) || 0);
       const myShare = expenses.filter((x) => x.currency === cur && x.kind !== 'settlement' && x.split.includes(me)).reduce((s, x) => s + x.amount / x.split.length, 0);
       return `
@@ -699,22 +748,22 @@ async function showExpenses(id) {
         </div>
         <ul class="ex-bal">${[...c.bal].filter(([, v]) => Math.abs(v) > 0.009).sort((a, b) => b[1] - a[1]).map(([p, v]) => `
           <li><span>${avatars([p])} ${esc(nameOf(p))}</span><span class="${v > 0 ? 'pos' : 'neg'}">${v > 0 ? 'gets back' : 'owes'} ${money(Math.abs(v), cur)}</span></li>`).join('')}</ul>`;
-    }).join('') : '<div class="ex-empty"><div class="empty-art" aria-hidden="true">🧾</div><strong>No expenses yet</strong><p class="fine">Log what each person pays. GoWander works out who owes whom, with the fewest payments.</p></div>';
+    }).join('') : '<div class="ex-empty"><div class="empty-art" aria-hidden="true">🧾</div><strong>No expenses yet</strong><p class="fine">Log what each person pays. GoWander works out who owes whom, with the fewest payments.</p></div>');
 
     // Settle up.
     const moves = [...by].flatMap(([cur, c]) => settlements(c.bal).map((m) => ({ ...m, cur })));
     $('ex-settle').hidden = !moves.length;
-    $('ex-settle').innerHTML = `
+    setHTML($('ex-settle'), `
       <h2 class="sec-h">Settle up</h2>
       <p class="fine">The fewest payments that square everyone up.</p>
       <ul class="ex-moves">${moves.map((m) => `
         <li><span>${avatars([m.from])} <strong>${esc(nameOf(m.from))}</strong> pays <strong>${esc(nameOf(m.to))}</strong> ${avatars([m.to])}</span>
           <span class="ex-move-r"><strong>${money(m.amount, m.cur)}</strong>
-          <button class="btn ghost small" type="button" data-settle='${esc(JSON.stringify(m))}'>Mark paid</button></span></li>`).join('')}</ul>`;
+          <button class="btn ghost small" type="button" data-settle='${esc(JSON.stringify(m))}'>Mark paid</button></span></li>`).join('')}</ul>`);
 
     // The list, newest first.
     const rows = [...expenses].sort((a, b) => b.date.localeCompare(a.date) || b.createdMs - a.createdMs);
-    $('ex-list').innerHTML = rows.map((x) => `
+    setHTML($('ex-list'), rows.map((x) => `
       <li class="ex-row${x.kind === 'settlement' ? ' settle' : ''}">
         <span class="ex-ic" aria-hidden="true">${x.kind === 'settlement' ? '🤝' : '🧾'}</span>
         <span class="ex-main">
@@ -728,7 +777,8 @@ async function showExpenses(id) {
           ${x.kind === 'settlement' ? '' : `<button class="icon-link" type="button" data-edit="${esc(x.id)}" title="Edit" aria-label="Edit ${esc(x.title)}">${ICON.edit}</button>`}
           <button class="icon-btn" type="button" data-del="${esc(x.id)}" title="Delete" aria-label="Delete ${esc(x.title)}">✕</button>
         </span>
-      </li>`).join('') || '<li class="muted small">Expenses you add appear here.</li>';
+      </li>`).join('') || '<li class="muted small">Expenses you add appear here.</li>');
+    reveal($('view-expenses'), 'rows', '.ex-row, .ex-bal li, .ex-moves li');
   }
 
   function resetForm() {
@@ -914,7 +964,7 @@ function renderMembers({ trip, meta }) {
   $('site-foot').textContent = 'Only members can open this trip. Access is enforced by Firebase security rules.';
   const members = [meta.ownerEmail, ...meta.memberEmails.filter((m) => m !== meta.ownerEmail)];
   const full = meta.memberEmails.length >= MAX_MEMBERS;
-  $('view-members').innerHTML = `
+  setHTML($('view-members'), `
     <section class="ed-card">
       <h2 class="sec-h">Invite people</h2>
       ${owner
@@ -970,20 +1020,14 @@ function renderMembers({ trip, meta }) {
       <h2 class="sec-h">Leave this trip</h2>
       <p class="fine">It disappears from your list. The owner can add you back later.</p>
       <div><button class="btn ghost danger" type="button" data-leave>Leave trip</button></div>
-    </section>`}`;
+    </section>`}`);
   showView('members');
+  reveal($('view-members'), 'members', '.members > li');
 
+  // Handlers are set as properties (one each), because an unchanged redraw keeps these elements.
   const view = $('view-members');
-  view.querySelector('[data-link-join]')?.addEventListener('change', async (e) => {
-    const on = e.target.checked;
-    e.target.disabled = true;
-    try {
-      await cloud.setLinkJoin(user, trip.id, on);
-      toast(on ? 'Anyone with the link can now join' : 'Link joining turned off. Only people you add by email can join.', 'ok');
-    } catch (err) { e.target.checked = !on; toast(err.message, 'bad'); }
-    e.target.disabled = false;
-  });
-  view.querySelector('#add-member')?.addEventListener('submit', async (e) => {
+  view.onsubmit = async (e) => {
+    if (e.target.id !== 'add-member') return;
     e.preventDefault();
     const email = String(new FormData(e.target).get('email') || '').trim().toLowerCase();
     if (!EMAIL.test(email)) { toast('Enter a valid email address.', 'bad'); return; }
@@ -993,9 +1037,19 @@ function renderMembers({ trip, meta }) {
       await cloud.setMembers(user, trip.id, [...meta.memberEmails, email], viewOnly ? [...meta.viewerEmails, email] : meta.viewerEmails);
       toast(`Added ${email}${viewOnly ? ' (view only)' : ''}. Now send them the invite link.`, 'ok');
     } catch (err) { toast(err.message, 'bad'); }
-  });
-  // Changing someone's access, or what link joiners get.
+  };
+  // Link joining on/off, someone's access, or what link joiners get.
   view.onchange = async (e) => {
+    if (e.target.matches('[data-link-join]')) {
+      const on = e.target.checked;
+      e.target.disabled = true;
+      try {
+        await cloud.setLinkJoin(user, trip.id, on);
+        toast(on ? 'Anyone with the link can now join' : 'Link joining turned off. Only people you add by email can join.', 'ok');
+      } catch (err) { e.target.checked = !on; toast(err.message, 'bad'); }
+      e.target.disabled = false;
+      return;
+    }
     const sel = e.target.closest('[data-role], [data-link-role]');
     if (!sel) return;
     const prev = sel.dataset.role ? (meta.viewerEmails.includes(sel.dataset.role) ? 'view' : 'edit') : meta.linkRole;
@@ -1198,13 +1252,15 @@ function subscribeMine() {
   unsubMine?.();
   unsubMine = null;
   myTrips = [];
+  myTripsLoaded = false;
   myTripsReady = new Promise((r) => { resolveMyTrips = r; });
   if (!user) { resolveMyTrips(); return; }
   cloud.watchMyTrips(user, (list) => {
     myTrips = list;
+    myTripsLoaded = true;
     resolveMyTrips();
     if (current === 'home') showHome();
-  }, (err) => { resolveMyTrips(); toast(err, 'bad'); }).then((u) => { unsubMine = u; });
+  }, (err) => { myTripsLoaded = true; resolveMyTrips(); toast(err, 'bad'); }).then((u) => { unsubMine = u; });
 }
 
 async function boot() {

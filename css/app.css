@@ -378,29 +378,31 @@ body:has(.ed-bar) .toaster { bottom: calc(80px + env(safe-area-inset-bottom)); }
 }
 html { -webkit-tap-highlight-color: transparent; }
 
-/* Screen transitions. The editor's save bar is position: fixed, so it's left out — a moving
-   ancestor would carry it along. */
-@keyframes view-in-forward { from { opacity: 0; transform: translate3d(32px, 0, 0); } to { opacity: 1; transform: none; } }
-@keyframes view-in-back { from { opacity: 0; transform: translate3d(-32px, 0, 0); } to { opacity: 1; transform: none; } }
-@keyframes hero-in-forward { from { opacity: 0; transform: translate3d(18px, 0, 0); } to { opacity: 1; transform: none; } }
-@keyframes hero-in-back { from { opacity: 0; transform: translate3d(-18px, 0, 0); } to { opacity: 1; transform: none; } }
-.view.enter-forward > :not(.editor), .view.enter-forward > .editor > :not(.ed-bar) { animation: view-in-forward .52s var(--spring) both; }
-.view.enter-back > :not(.editor), .view.enter-back > .editor > :not(.ed-bar) { animation: view-in-back .52s var(--spring) both; }
-.hero-inner.enter-forward > * { animation: hero-in-forward .5s var(--spring) both; }
-.hero-inner.enter-back > * { animation: hero-in-back .5s var(--spring) both; }
+/* Screen transitions: the screen and header text slide as one piece. These elements stay put
+   while their content is redrawn, so a redraw mid-slide doesn't restart it. The editor's save bar
+   is position: fixed, so there the form's sections move instead (a moving ancestor would carry it). */
+@keyframes view-in-forward { from { opacity: 0; transform: translate3d(28px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes view-in-back { from { opacity: 0; transform: translate3d(-28px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes hero-in-forward { from { opacity: 0; transform: translate3d(16px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes hero-in-back { from { opacity: 0; transform: translate3d(-16px, 0, 0); } to { opacity: 1; transform: none; } }
+.view.enter-forward:not(#view-edit), #view-edit.enter-forward .editor > :not(.ed-bar) { animation: view-in-forward .48s var(--spring) both; }
+.view.enter-back:not(#view-edit), #view-edit.enter-back .editor > :not(.ed-bar) { animation: view-in-back .48s var(--spring) both; }
+.hero-inner.enter-forward { animation: hero-in-forward .46s var(--spring) both; }
+.hero-inner.enter-back { animation: hero-in-back .46s var(--spring) both; }
+.view.enter-forward, .view.enter-back, .hero-inner.enter-forward, .hero-inner.enter-back { will-change: transform, opacity; }
+/* Lists rise in once per visit — done in main.js (reveal) with the Web Animations API. */
 
-/* Lists rise in one after another, only while a screen is opening (live refreshes don't replay it). */
-@keyframes rise-in { from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.985); } to { opacity: 1; transform: none; } }
-.view.entering :is(.trip-list > *, .timeline > .tl, .cl-items > li, .ex-list > li, .ex-moves > li, .members > li) {
-  animation: rise-in .55s var(--spring) both;
+/* Placeholder cards while the trip list loads (also painted by index.html before the app starts). */
+@keyframes shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+.home-skel { display: grid; gap: 14px; }
+.sk-line, .sk-card {
+  border-radius: 12px; background: linear-gradient(100deg, var(--surface-2) 30%, var(--surface) 50%, var(--surface-2) 70%) 0 0 / 200% 100%;
+  animation: shimmer 1.4s linear infinite;
 }
-.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(2) { animation-delay: 40ms; }
-.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(3) { animation-delay: 80ms; }
-.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(4) { animation-delay: 120ms; }
-.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(5) { animation-delay: 160ms; }
-.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(6) { animation-delay: 200ms; }
-.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(7) { animation-delay: 240ms; }
-.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(n+8) { animation-delay: 280ms; }
+.sk-line { height: 14px; }
+.sk-line.w40 { width: 40%; height: 22px; }
+.sk-line.w25 { width: 25%; }
+.sk-card { height: 238px; border-radius: 18px; border: 1px solid var(--line); }
 
 /* Switching day tabs slides the day in from the side of the tab you picked. */
 @keyframes day-next { from { opacity: 0; transform: translate3d(36px, 0, 0); } to { opacity: 1; transform: none; } }
