@@ -388,8 +388,10 @@ function renderTripTools(trip, { sample = false, preview = false } = {}) {
     if (!b) return;
     if (b.dataset.tool === 'calendar') {
       const n = trip.days.reduce((k, d) => k + d.stops.length, 0);
-      downloadIcs(trip);
-      toast(`Calendar file downloaded. Open it to add ${n} event${n === 1 ? '' : 's'} to your calendar.`, 'ok');
+      const how = downloadIcs(trip);
+      if (how === 'downloaded') toast(`Calendar file downloaded. Open it to add ${n} event${n === 1 ? '' : 's'} to your calendar.`, 'ok');
+      else if (how === 'safari-only') toast('On iPhone, only Safari can add events to Apple Calendar. Open this trip in Safari and tap Add to calendar again.', 'info', { duration: 9000 });
+      // 'opened': iOS shows its own "Add All" calendar sheet.
       return;
     }
     if (offlineRun) return;

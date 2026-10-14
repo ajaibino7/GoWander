@@ -6,7 +6,7 @@
 // VERSION and SHELL are written by scripts/stamp.mjs — don't edit between the build markers.
 
 // build:version
-const VERSION = 'be7fe47e';
+const VERSION = 'f3c2c367';
 // /build:version
 const CACHE = `gowander-${VERSION}`;
 
@@ -21,12 +21,12 @@ const SHELL = [
   './css/app.css?v=99ffba6b58',
   './css/styles.css?v=8b049819ca',
   './js/autocover.js?v=8afe28294f',
-  './js/calendar.js?v=2878c14752',
+  './js/calendar.js?v=29ffa349f9',
   './js/cloud.js?v=3956b81144',
   './js/editor.js?v=5b40e8f392',
   './js/firebase-config.js?v=caeca71f59',
   './js/live.js?v=099883dea9',
-  './js/main.js?v=cb0cdaff7b',
+  './js/main.js?v=fc6c4571e6',
   './js/nearby.js?v=8656ebc47c',
   './js/offline.js?v=8a40b2d162',
   './js/placepicker.js?v=3594d48934',
