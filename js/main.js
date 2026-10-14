@@ -2,12 +2,14 @@
 import { esc, fmtRange, toast, ask, toastLink, makeClock, deviceTz, THEMES, addDays } from './util.js';
 import * as store from './store.js';
 import * as cloud from './cloud.js';
-import { mountTrip, unmountTrip, setDone, sim } from './live.js';
+import { mountTrip, unmountTrip, setDone, sim, DAYS } from './live.js';
 import { mountEditor } from './editor.js';
 import { autoCover, smallUrl, creditUrl } from './autocover.js';
+import { downloadIcs } from './calendar.js';
+import { makeOfflineReady, offlineStatus } from './offline.js';
 
 const $ = (id) => document.getElementById(id);
-const VIEWS = ['home', 'trip', 'edit', 'members', 'settings', 'import'];
+const VIEWS = ['home', 'trip', 'edit', 'members', 'settings', 'import', 'checklist', 'expenses'];
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_MEMBERS = 20;
 
@@ -21,10 +23,30 @@ let unsubMine = null;
 let cleanups = []; // live listeners for the current screen, closed on navigation
 const keep = (unsub) => { if (unsub) cleanups.push(unsub); };
 
+// How deep each screen sits, so moving deeper slides in from the right and going back from the left.
+const DEPTH = { home: 0, settings: 1, import: 1, trip: 1, edit: 2, members: 2, checklist: 2, expenses: 2 };
 function showView(name) {
+  const prev = current;
   for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
   current = name;
+  if (prev !== name) animateIn(name, prev && DEPTH[name] < DEPTH[prev] ? 'back' : 'forward');
 }
+
+// Plays the screen's entrance (styles in app.css → Motion). "entering" also lets its lists rise in,
+// then it's removed so later live refreshes don't replay anything.
+let enterTimer = null;
+function animateIn(name, dir) {
+  const els = [$(`view-${name}`), document.querySelector('.hero-inner')];
+  for (const el of els) {
+    el.classList.remove('enter-forward', 'enter-back', 'entering');
+    void el.offsetWidth; // restart the animation
+    el.classList.add(`enter-${dir}`, 'entering');
+  }
+  clearTimeout(enterTimer);
+  enterTimer = setTimeout(() => els.forEach((el) => el.classList.remove('enter-forward', 'enter-back', 'entering')), 900);
+}
+// iOS Safari only shows :active (the press-down effect) when the page listens for touches.
+document.addEventListener('touchstart', () => {}, { passive: true });
 
 const fancyTitle = (t) => esc(t).replace(/ (\+|&amp;) /g, ' <em>$1</em> ');
 // trip: the trip this page is about, so its cover photo (if any) fills the header.
@@ -147,6 +169,11 @@ const ICON = {
   users: svg('<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>'),
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
   upload: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/>'),
+  download: svg('<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5M12 15V3"/>'),
+  check: svg('<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-6"/>'),
+  wallet: svg('<path d="M20 7H5a2 2 0 0 1 0-4h13v4"/><path d="M3 5v14a2 2 0 0 0 2 2h15V7"/><circle cx="16" cy="14" r="1.5"/>'),
+  calplus: svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M12 13v5M9.5 15.5h5"/>'),
+  done: svg('<path d="M20 6L9 17l-5-5"/>'),
 };
 
 // Members as overlapping initials, coloured per person.
@@ -290,8 +317,9 @@ function showHome({ message = '' } = {}) {
         return card(trip, i, {
           members: meta.memberEmails,
           badges: `${owner ? '<span class="badge pub">Owner</span>' : `<span class="badge local" title="${esc(meta.ownerEmail)}">Shared by ${esc(meta.ownerEmail.split('@')[0])}</span>`}
+            ${canEditTrip(meta) ? '' : '<span class="badge view">View only</span>'}
             ${meta.pending ? '<span class="badge dirty">Syncing…</span>' : ''}`,
-          actions: `<a class="icon-link" href="#/edit/${enc(trip.id)}" title="Edit trip" aria-label="Edit ${esc(trip.title)}">${ICON.edit}</a><a class="icon-link" href="#/members/${enc(trip.id)}" title="Members" aria-label="Members of ${esc(trip.title)}">${ICON.users}</a>`,
+          actions: `${canEditTrip(meta) ? `<a class="icon-link" href="#/edit/${enc(trip.id)}" title="Edit trip" aria-label="Edit ${esc(trip.title)}">${ICON.edit}</a>` : ''}<a class="icon-link" href="#/members/${enc(trip.id)}" title="Members" aria-label="Members of ${esc(trip.title)}">${ICON.users}</a>`,
         });
       }).join('') || `
         <div class="empty">
@@ -318,18 +346,72 @@ function tripNav(trip, { sample = false, preview = false, meta = null } = {}) {
     return `${backLink()}<span class="hn-right">${user ? `<button class="hn-btn" type="button" data-copy-sample="${esc(trip.id)}">Copy to my trips</button>` : ''}</span>`;
   }
   const n = meta?.memberEmails.length || 1;
-  return `${backLink()}<span class="hn-right"><a class="hn-btn" href="#/members/${enc(trip.id)}">👥 ${n}</a><a class="hn-btn" href="#/edit/${enc(trip.id)}">Edit</a></span>`;
+  const edit = canEditTrip(meta)
+    ? `<a class="hn-btn" href="#/edit/${enc(trip.id)}">Edit</a>`
+    : '<span class="hn-btn hn-static" title="The owner gave you view-only access">👁 View only</span>';
+  return `${backLink()}<span class="hn-right"><a class="hn-btn" href="#/members/${enc(trip.id)}">👥 ${n}</a>${edit}</span>`;
 }
 
 function showTripObject(trip, opts) {
   setHero({ eyebrow: opts.sample ? 'Sample trip' : 'GoWander · live', title: trip.title, desc: trip.subtitle, nav: tripNav(trip, opts), trip: opts.preview ? null : trip.id });
   if (!opts.preview) ensureAutoCover(trip);
+  renderTripTools(trip, opts);
   showView('trip');
   mountTrip(trip, { onDone: opts.onDone });
 }
 
 // Opening a trip you're not in: offer to join. Firebase only lets it through if the owner
 // has turned on "Anyone with the link can join".
+/* ---------- trip tools: checklist, expenses, calendar, offline ---------- */
+let offlineRun = null; // { tripId, done, total } while saving for offline use
+
+function offlineLabel(tripId) {
+  if (offlineRun?.tripId === tripId) return `Saving ${Math.min(offlineRun.done + 1, offlineRun.total)} of ${offlineRun.total}…`;
+  return offlineStatus(tripId) ? 'Saved offline' : 'Save offline';
+}
+
+function renderTripTools(trip, { sample = false, preview = false } = {}) {
+  const el = $('trip-tools');
+  if (preview) { el.innerHTML = ''; return; }
+  const st = offlineStatus(trip.id);
+  const busy = offlineRun?.tripId === trip.id;
+  el.innerHTML = `
+    ${sample ? '' : `
+      <a class="tool" href="#/checklist/${enc(trip.id)}">${ICON.check}<span>Checklist</span></a>
+      <a class="tool" href="#/expenses/${enc(trip.id)}">${ICON.wallet}<span>Expenses</span></a>`}
+    <button class="tool" type="button" data-tool="calendar">${ICON.calplus}<span>Add to calendar</span></button>
+    <button class="tool${st && !busy ? ' ok' : ''}" type="button" data-tool="offline"${busy ? ' disabled' : ''}
+      title="${st ? `Saved ${esc(new Date(st.at).toLocaleString())} · tap to update` : 'Save weather, travel times, photos and nearby places for use without signal'}">
+      ${st && !busy ? ICON.done : ICON.download}<span>${esc(offlineLabel(trip.id))}</span></button>`;
+  el.onclick = async (e) => {
+    const b = e.target.closest('[data-tool]');
+    if (!b) return;
+    if (b.dataset.tool === 'calendar') {
+      const n = trip.days.reduce((k, d) => k + d.stops.length, 0);
+      downloadIcs(trip);
+      toast(`Calendar file downloaded. Open it to add ${n} event${n === 1 ? '' : 's'} to your calendar.`, 'ok');
+      return;
+    }
+    if (offlineRun) return;
+    if (!navigator.onLine) { toast('You\'re offline. Connect first, then save the trip for offline use.', 'bad'); return; }
+    offlineRun = { tripId: trip.id, done: 0, total: 1 };
+    renderTripTools(trip, { sample });
+    try {
+      const r = await makeOfflineReady(trip, DAYS, ({ done, total }) => {
+        offlineRun = { tripId: trip.id, done, total };
+        const label = $('trip-tools').querySelector('[data-tool="offline"] span');
+        if (label) label.textContent = offlineLabel(trip.id);
+      });
+      toast(r.failed
+        ? `Saved for offline use, but ${r.failed} item${r.failed === 1 ? '' : 's'} couldn't be fetched. Tap again later to finish.`
+        : `Ready offline: weather, travel times, photo and nearby places for ${r.places} place${r.places === 1 ? '' : 's'}.`, r.failed ? 'info' : 'ok');
+    } finally {
+      offlineRun = null;
+      if (current === 'trip') renderTripTools(trip, { sample });
+    }
+  };
+}
+
 function showDenied(id) {
   setHero({ eyebrow: 'Trip invite', title: 'Join this trip', nav: backLink() });
   $('view-import').innerHTML = `
@@ -386,6 +468,329 @@ async function showTrip(id) {
 }
 
 /* ============================================================
+   Shared pages for a trip (checklist, expenses): common header + access handling.
+   draw(entry) runs whenever the trip changes; the page's own data has its own watcher.
+   ============================================================ */
+async function tripPage(id, view, eyebrow, draw) {
+  if (!user) { showHome({ message: 'Sign in with Google to open this trip.' }); return false; }
+  watchCoverFor(id);
+  let first = true;
+  keep(await cloud.watchTrip(id, (entry) => {
+    if (!entry) { toast('This trip was deleted, or you were removed from it.', 'bad'); location.replace('#/'); return; }
+    setHero({ eyebrow, title: entry.trip.title, nav: backLink(`#/trip/${enc(id)}`, 'Back to trip'), trip: id });
+    ensureAutoCover(entry.trip);
+    $('site-foot').textContent = 'Shared with everyone on this trip. Changes sync live, and work offline too.';
+    draw(entry, first);
+    if (first) { first = false; showView(view); }
+  }, (err) => { if (err === 'denied') showDenied(id); else toast(err, 'bad'); }));
+  return true;
+}
+const nameOf = (email) => (email === user?.email ? 'You' : (email || '').split('@')[0]);
+
+/* ---------- checklist ---------- */
+const CHECKLISTS = {
+  packing: {
+    title: '🎒 Packing', placeholder: 'Add something to pack', noun: 'packed',
+    ideas: ['Phone charger', 'Power bank', 'ID / passport', 'Tickets', 'Medicines', 'Sunscreen', 'Sunglasses', 'Umbrella or raincoat', 'Toiletries', 'Comfortable shoes', 'Cash & cards', 'Water bottle'],
+  },
+  todo: {
+    title: '📝 To-do', placeholder: 'Add a to-do, e.g. Book a cab to the airport', noun: 'done',
+    ideas: ['Book stays', 'Book tickets', 'Check the weather', 'Make the trip offline-ready', 'Share the trip link', 'Keep ID copies'],
+  },
+};
+
+async function showChecklist(id) {
+  let items = [];
+  const ok = await tripPage(id, 'checklist', 'Checklist', (entry, first) => {
+    if (!first) return;
+    $('view-checklist').innerHTML = Object.entries(CHECKLISTS).map(([list, c]) => `
+      <section class="ed-card cl-card" data-list="${list}">
+        <div class="cl-head"><h2 class="sec-h">${c.title}</h2><span class="cl-count muted small"></span></div>
+        <div class="cl-bar" aria-hidden="true"><span></span></div>
+        <ul class="cl-items"></ul>
+        <form class="cl-add form" data-list="${list}" novalidate>
+          <input name="text" maxlength="200" placeholder="${esc(c.placeholder)}" aria-label="${esc(c.placeholder)}" autocomplete="off">
+          <button class="btn" type="submit">Add</button>
+        </form>
+        <div class="cl-ideas"></div>
+      </section>`).join('');
+    paintChecklist(items);
+  });
+  if (!ok) return;
+  keep(await cloud.watchList(id, 'checklist', (list) => { items = list; paintChecklist(items); }, (err) => toast(err, 'bad')));
+
+  const view = $('view-checklist');
+  view.onsubmit = async (e) => {
+    e.preventDefault();
+    const form = e.target.closest('.cl-add');
+    const input = form?.querySelector('input');
+    const text = input?.value.trim();
+    if (!text) return;
+    input.value = '';
+    input.focus();
+    try { await cloud.addChecklistItem(user, id, form.dataset.list, text); } catch (err) { toast(err.message, 'bad'); }
+  };
+  view.onchange = async (e) => {
+    const box = e.target.closest('[data-toggle]');
+    if (!box) return;
+    if (box.checked) justTicked.set(box.dataset.toggle, Date.now());
+    try {
+      await cloud.updateChecklistItem(user, id, box.dataset.toggle, { done: box.checked, doneBy: box.checked ? user.email : '' });
+    } catch (err) { box.checked = !box.checked; toast(err.message, 'bad'); }
+  };
+  view.onclick = async (e) => {
+    const del = e.target.closest('[data-del]');
+    const idea = e.target.closest('[data-idea]');
+    try {
+      if (del) await cloud.deleteListItem(id, 'checklist', del.dataset.del);
+      else if (idea) await cloud.addChecklistItem(user, id, idea.closest('.cl-card').dataset.list, idea.dataset.idea);
+    } catch (err) { toast(err.message, 'bad'); }
+  };
+}
+
+// Items ticked in the last moment get the "pop" — the list redraws on every change, so it can't
+// just be a class on the element that was clicked.
+const justTicked = new Map();
+function paintChecklist(items) {
+  for (const card of document.querySelectorAll('#view-checklist .cl-card')) {
+    const list = card.dataset.list;
+    const mine = items.filter((x) => x.list === list)
+      .sort((a, b) => Number(a.done) - Number(b.done) || a.createdMs - b.createdMs);
+    const done = mine.filter((x) => x.done).length;
+    card.querySelector('.cl-count').textContent = mine.length ? `${done} of ${mine.length} ${CHECKLISTS[list].noun}` : '';
+    card.querySelector('.cl-bar span').style.width = mine.length ? `${(done / mine.length) * 100}%` : '0';
+    card.querySelector('.cl-items').innerHTML = mine.map((x) => `
+      <li class="cl-item${x.done ? ' done' : ''}${x.done && Date.now() - (justTicked.get(x.id) || 0) < 800 ? ' pop' : ''}">
+        <label><input type="checkbox" data-toggle="${esc(x.id)}"${x.done ? ' checked' : ''}><span class="cl-text">${esc(x.text)}</span></label>
+        ${x.done && x.doneBy ? `<span class="cl-by" title="${esc(x.doneBy)}">✓ ${esc(nameOf(x.doneBy))}</span>` : ''}
+        <button class="icon-btn" type="button" data-del="${esc(x.id)}" title="Remove" aria-label="Remove ${esc(x.text)}">✕</button>
+      </li>`).join('') || '<li class="cl-empty muted small">Nothing here yet. Add your own, or pick from the ideas below.</li>';
+    const have = new Set(mine.map((x) => x.text.toLowerCase()));
+    const ideas = CHECKLISTS[list].ideas.filter((t) => !have.has(t.toLowerCase())).slice(0, 8);
+    card.querySelector('.cl-ideas').innerHTML = ideas.map((t) => `<button class="chip-btn" type="button" data-idea="${esc(t)}">+ ${esc(t)}</button>`).join('');
+  }
+}
+
+/* ---------- expenses ---------- */
+const CURRENCIES = ['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'THB', 'MYR', 'IDR', 'LKR', 'NPR', 'JPY', 'AUD', 'CAD', 'CHF', 'VND'];
+// A sensible default from the trip's timezone; after that, whatever was used last on this trip.
+function tripCurrency(trip) {
+  try { const last = localStorage.getItem(`gw-cur-${trip.id}`); if (last) return last; } catch { /* storage unavailable */ }
+  const tz = trip.timezone || '';
+  const byTz = { 'Asia/Kolkata': 'INR', 'Asia/Calcutta': 'INR', 'Asia/Dubai': 'AED', 'Asia/Singapore': 'SGD', 'Asia/Bangkok': 'THB', 'Asia/Kuala_Lumpur': 'MYR',
+    'Asia/Jakarta': 'IDR', 'Asia/Makassar': 'IDR', 'Asia/Colombo': 'LKR', 'Asia/Kathmandu': 'NPR', 'Asia/Tokyo': 'JPY', 'Europe/London': 'GBP', 'Europe/Zurich': 'CHF', 'Asia/Ho_Chi_Minh': 'VND' };
+  if (byTz[tz]) return byTz[tz];
+  if (tz.startsWith('Europe/')) return 'EUR';
+  if (tz.startsWith('Australia/')) return 'AUD';
+  if (/^America\/(Toronto|Vancouver|Edmonton|Winnipeg|Halifax)/.test(tz)) return 'CAD';
+  if (tz.startsWith('America/')) return 'USD';
+  return 'INR';
+}
+function money(n, cur) {
+  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(n); } catch { return `${cur} ${n.toFixed(2)}`; }
+}
+const round2 = (n) => Math.round(n * 100) / 100;
+
+// Per currency: net balance per person (+ = is owed, − = owes). Expenses and settlements use the
+// same rule: the payer is credited the amount; everyone in the split is debited an equal share.
+function balances(expenses) {
+  const by = new Map();
+  for (const x of expenses) {
+    if (!by.has(x.currency)) by.set(x.currency, { bal: new Map(), spent: 0 });
+    const c = by.get(x.currency);
+    if (x.kind !== 'settlement') c.spent += x.amount;
+    c.bal.set(x.paidBy, (c.bal.get(x.paidBy) || 0) + x.amount);
+    for (const p of x.split) c.bal.set(p, (c.bal.get(p) || 0) - x.amount / x.split.length);
+  }
+  return by;
+}
+// The fewest payments that settle everyone up: repeatedly match the biggest debtor with the biggest creditor.
+function settlements(bal) {
+  const owe = [...bal].filter(([, v]) => v < -0.009).map(([p, v]) => ({ p, v: -v })).sort((a, b) => b.v - a.v);
+  const get = [...bal].filter(([, v]) => v > 0.009).map(([p, v]) => ({ p, v })).sort((a, b) => b.v - a.v);
+  const out = [];
+  while (owe.length && get.length) {
+    const a = owe[0], b = get[0], amt = round2(Math.min(a.v, b.v));
+    if (amt >= 0.01) out.push({ from: a.p, to: b.p, amount: amt });
+    a.v -= amt; b.v -= amt;
+    if (a.v < 0.01) owe.shift();
+    if (b.v < 0.01) get.shift();
+  }
+  return out;
+}
+
+async function showExpenses(id) {
+  let expenses = [], trip = null, members = [], editing = null;
+  const ok = await tripPage(id, 'expenses', 'Expenses', (entry, first) => {
+    trip = entry.trip;
+    const changed = members.join() !== entry.meta.memberEmails.join();
+    members = entry.meta.memberEmails;
+    if (first) {
+      const cur = tripCurrency(trip);
+      $('view-expenses').innerHTML = `
+        <section class="ed-card ex-summary" id="ex-summary"></section>
+        <section class="ed-card" id="ex-settle" hidden></section>
+        <section class="ed-card">
+          <h2 class="sec-h" id="ex-form-h">Add an expense</h2>
+          <form id="ex-form" class="form ex-form" novalidate>
+            <div class="grid2">
+              <label class="fld"><span>What for</span><input name="title" maxlength="120" placeholder="e.g. Dinner at Colaba" autocomplete="off"></label>
+              <div class="ex-amt">
+                <label class="fld"><span>Amount</span><input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00"></label>
+                <label class="fld"><span>Currency</span><select name="currency">${[...new Set([cur, ...CURRENCIES])].map((c) => `<option${c === cur ? ' selected' : ''}>${c}</option>`).join('')}</select></label>
+              </div>
+            </div>
+            <div class="grid2">
+              <label class="fld"><span>Paid by</span><select name="paidBy" id="ex-paidby"></select></label>
+              <label class="fld"><span>Date</span><input name="date" type="date" value="${makeClock(trip.timezone).dateKey(new Date())}"></label>
+            </div>
+            <div class="fld"><span>Split equally between</span><div class="ex-split" id="ex-split"></div></div>
+            <div class="home-actions">
+              <button class="btn" type="submit" id="ex-submit">Add expense</button>
+              <button class="btn ghost" type="button" data-ex-cancel hidden>Cancel edit</button>
+            </div>
+          </form>
+        </section>
+        <section class="ed-card">
+          <h2 class="sec-h">All expenses</h2>
+          <ul class="ex-list" id="ex-list"></ul>
+        </section>`;
+    }
+    if (first || changed) paintMembers();
+    paintExpenses();
+  });
+  if (!ok) return;
+  keep(await cloud.watchList(id, 'expenses', (list) => { expenses = list; paintExpenses(); }, (err) => toast(err, 'bad')));
+
+  // Who paid / who shares: the trip's current members, keeping what's already ticked.
+  function paintMembers(paidBy = null, split = null) {
+    const form = $('ex-form');
+    if (!form) return;
+    const sel = paidBy || form.paidBy.value || user.email;
+    const ticked = split || [...form.querySelectorAll('[name="split"]:checked')].map((x) => x.value);
+    const on = (m) => (ticked.length ? ticked.includes(m) : true);
+    form.paidBy.innerHTML = members.map((m) => `<option value="${esc(m)}"${m === sel ? ' selected' : ''}>${esc(nameOf(m))}${m === user.email ? '' : ` (${esc(m)})`}</option>`).join('');
+    $('ex-split').innerHTML = members.map((m) => `
+      <label class="chk ex-who"><input type="checkbox" name="split" value="${esc(m)}"${on(m) ? ' checked' : ''}> ${esc(nameOf(m))}</label>`).join('');
+  }
+
+  function paintExpenses() {
+    if (!$('ex-list')) return;
+    const by = balances(expenses);
+    const me = user.email;
+    // Summary per currency.
+    $('ex-summary').innerHTML = by.size ? [...by].map(([cur, c]) => {
+      const mine = round2(c.bal.get(me) || 0);
+      const myShare = expenses.filter((x) => x.currency === cur && x.kind !== 'settlement' && x.split.includes(me)).reduce((s, x) => s + x.amount / x.split.length, 0);
+      return `
+        <div class="ex-stats">
+          <div class="stat"><div class="k">Total spent</div><div class="v">${money(c.spent, cur)}</div></div>
+          <div class="stat"><div class="k">Your share</div><div class="v">${money(myShare, cur)}</div></div>
+          <div class="stat ${mine > 0.009 ? 'pos' : mine < -0.009 ? 'neg' : ''}"><div class="k">${mine > 0.009 ? 'You are owed' : mine < -0.009 ? 'You owe' : 'Your balance'}</div><div class="v">${mine > 0.009 || mine < -0.009 ? money(Math.abs(mine), cur) : 'Settled'}</div></div>
+        </div>
+        <ul class="ex-bal">${[...c.bal].filter(([, v]) => Math.abs(v) > 0.009).sort((a, b) => b[1] - a[1]).map(([p, v]) => `
+          <li><span>${avatars([p])} ${esc(nameOf(p))}</span><span class="${v > 0 ? 'pos' : 'neg'}">${v > 0 ? 'gets back' : 'owes'} ${money(Math.abs(v), cur)}</span></li>`).join('')}</ul>`;
+    }).join('') : '<div class="ex-empty"><div class="empty-art" aria-hidden="true">🧾</div><strong>No expenses yet</strong><p class="fine">Log what each person pays. GoWander works out who owes whom, with the fewest payments.</p></div>';
+
+    // Settle up.
+    const moves = [...by].flatMap(([cur, c]) => settlements(c.bal).map((m) => ({ ...m, cur })));
+    $('ex-settle').hidden = !moves.length;
+    $('ex-settle').innerHTML = `
+      <h2 class="sec-h">Settle up</h2>
+      <p class="fine">The fewest payments that square everyone up.</p>
+      <ul class="ex-moves">${moves.map((m) => `
+        <li><span>${avatars([m.from])} <strong>${esc(nameOf(m.from))}</strong> pays <strong>${esc(nameOf(m.to))}</strong> ${avatars([m.to])}</span>
+          <span class="ex-move-r"><strong>${money(m.amount, m.cur)}</strong>
+          <button class="btn ghost small" type="button" data-settle='${esc(JSON.stringify(m))}'>Mark paid</button></span></li>`).join('')}</ul>`;
+
+    // The list, newest first.
+    const rows = [...expenses].sort((a, b) => b.date.localeCompare(a.date) || b.createdMs - a.createdMs);
+    $('ex-list').innerHTML = rows.map((x) => `
+      <li class="ex-row${x.kind === 'settlement' ? ' settle' : ''}">
+        <span class="ex-ic" aria-hidden="true">${x.kind === 'settlement' ? '🤝' : '🧾'}</span>
+        <span class="ex-main">
+          <span class="ex-title">${esc(x.title)}</span>
+          <span class="ex-meta">${esc(fmtRange(x.date, x.date))} · ${x.kind === 'settlement'
+            ? `${esc(nameOf(x.paidBy))} paid ${esc(nameOf(x.split[0]))}`
+            : `Paid by ${esc(nameOf(x.paidBy))} · ${x.split.length === members.length ? 'split with everyone' : `split ${x.split.length} way${x.split.length === 1 ? '' : 's'}`}`}</span>
+        </span>
+        <span class="ex-amtv">${money(x.amount, x.currency)}</span>
+        <span class="ex-actions">
+          ${x.kind === 'settlement' ? '' : `<button class="icon-link" type="button" data-edit="${esc(x.id)}" title="Edit" aria-label="Edit ${esc(x.title)}">${ICON.edit}</button>`}
+          <button class="icon-btn" type="button" data-del="${esc(x.id)}" title="Delete" aria-label="Delete ${esc(x.title)}">✕</button>
+        </span>
+      </li>`).join('') || '<li class="muted small">Expenses you add appear here.</li>';
+  }
+
+  function resetForm() {
+    editing = null;
+    const form = $('ex-form');
+    form.title.value = '';
+    form.amount.value = '';
+    $('ex-form-h').textContent = 'Add an expense';
+    $('ex-submit').textContent = 'Add expense';
+    form.querySelector('[data-ex-cancel]').hidden = true;
+    paintMembers(user.email, members);
+  }
+
+  const view = $('view-expenses');
+  view.onsubmit = async (e) => {
+    e.preventDefault();
+    const form = $('ex-form');
+    const title = form.title.value.trim();
+    const amount = round2(Number(form.amount.value));
+    const split = [...form.querySelectorAll('[name="split"]:checked')].map((x) => x.value);
+    if (!title) { toast('Say what the expense was for.', 'bad'); form.title.focus(); return; }
+    if (!(amount > 0)) { toast('Enter an amount above zero.', 'bad'); form.amount.focus(); return; }
+    if (!split.length) { toast('Pick at least one person to split it with.', 'bad'); return; }
+    const expense = { title, amount, currency: form.currency.value, paidBy: form.paidBy.value, split, date: form.date.value || makeClock(trip.timezone).dateKey(new Date()), kind: 'expense' };
+    try { localStorage.setItem(`gw-cur-${id}`, expense.currency); } catch { /* storage unavailable */ }
+    const wasEditing = editing;
+    resetForm();
+    try {
+      await cloud.saveExpense(user, id, expense, wasEditing);
+      toast(wasEditing ? 'Expense updated' : `Added ${money(amount, expense.currency)} · ${title}`, 'ok');
+    } catch (err) { toast(err.message, 'bad'); }
+  };
+  view.onclick = async (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    try {
+      if (b.dataset.del) {
+        const x = expenses.find((y) => y.id === b.dataset.del);
+        if (!x || !(await ask(`Delete “${x.title}”?`, { detail: 'Balances update for everyone.', ok: 'Delete', danger: true }))) return;
+        if (editing === x.id) resetForm();
+        await cloud.deleteListItem(id, 'expenses', x.id);
+      } else if (b.dataset.edit) {
+        const x = expenses.find((y) => y.id === b.dataset.edit);
+        if (!x) return;
+        editing = x.id;
+        const form = $('ex-form');
+        form.title.value = x.title;
+        form.amount.value = x.amount;
+        form.currency.value = x.currency;
+        form.date.value = x.date;
+        paintMembers(x.paidBy, x.split);
+        $('ex-form-h').textContent = 'Edit expense';
+        $('ex-submit').textContent = 'Save changes';
+        form.querySelector('[data-ex-cancel]').hidden = false;
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else if ('exCancel' in b.dataset) {
+        resetForm();
+      } else if (b.dataset.settle) {
+        const m = JSON.parse(b.dataset.settle);
+        if (!(await ask(`${nameOf(m.from)} paid ${nameOf(m.to)} ${money(m.amount, m.cur)}?`, { detail: 'This records the payment and updates everyone\'s balance.', ok: 'Mark paid' }))) return;
+        await cloud.saveExpense(user, id, {
+          title: `${m.from.split('@')[0]} paid back ${m.to.split('@')[0]}`,
+          amount: m.amount, currency: m.cur, paidBy: m.from, split: [m.to], date: makeClock(trip.timezone).dateKey(new Date()), kind: 'settlement',
+        });
+        toast('Payment recorded', 'ok');
+      }
+    } catch (err) { toast(err.message, 'bad'); }
+  };
+}
+
+/* ============================================================
    Editor
    ============================================================ */
 function blankTrip() {
@@ -400,6 +805,11 @@ async function showEdit(id) {
   const isNew = id === 'new';
   const entry = isNew ? null : await findMine(id);
   if (!isNew && !entry) { toast('Trip not found, or you\'re not a member.', 'bad'); location.replace('#/'); return; }
+  if (!isNew && !canEditTrip(entry.meta)) {
+    toast('You have view-only access to this trip. Ask the owner if you need to edit it.', 'info');
+    location.replace(`#/trip/${enc(id)}`);
+    return;
+  }
   const trip = isNew ? blankTrip() : entry.trip;
   const baseMs = entry?.meta.updatedAtMs || 0;
   const owner = entry?.meta.ownerUid === user.uid;
@@ -483,6 +893,10 @@ async function showMembers(id) {
   }, (err) => { if (err === 'denied') showDenied(id); else toast(err, 'bad'); }));
 }
 
+const roleOptions = (role) => `<option value="edit"${role === 'edit' ? ' selected' : ''}>Can edit</option><option value="view"${role === 'view' ? ' selected' : ''}>View only</option>`;
+// Owners always edit; other members unless the owner made them view-only.
+const canEditTrip = (meta) => !!meta && !meta.viewerEmails.includes(user?.email);
+
 function renderMembers({ trip, meta }) {
   const owner = meta.ownerUid === user.uid;
   const invite = `${location.origin}${location.pathname}#/trip/${enc(trip.id)}`;
@@ -500,6 +914,10 @@ function renderMembers({ trip, meta }) {
       <p class="fine">${meta.linkJoin
         ? `Send this link to friends. They open it, sign in with Google and tap <em>Join trip</em>. No need to type their email.${full ? ` <strong>This trip is full (${MAX_MEMBERS} members).</strong>` : ''}`
         : (owner ? 'Turn this on to let people join with just the link. Otherwise, add their Google email below first, then send them the link.' : 'Send this link to people the owner has added by email.')}</p>
+      ${meta.linkJoin ? (owner
+        ? `<label class="fld role-line"><span>People who join with the link</span>
+            <select class="role-sel" data-link-role>${roleOptions(meta.linkRole)}</select></label>`
+        : `<p class="fine">People who join with the link <strong>${meta.linkRole === 'view' ? 'can only view' : 'can edit'}</strong> the plan.</p>`) : ''}
       <div class="invite-row">
         <input class="invite-url" readonly value="${esc(invite)}" aria-label="Invite link">
         <button class="btn" type="button" data-invite="${esc(invite)}">${navigator.share ? 'Share' : 'Copy'}</button>
@@ -509,21 +927,27 @@ function renderMembers({ trip, meta }) {
     <section class="ed-card">
       <h2 class="sec-h">Who can see and edit this trip</h2>
       <ul class="members">
-        ${members.map((m) => `
+        ${members.map((m) => {
+          const viewer = meta.viewerEmails.includes(m);
+          return `
           <li>
             <span class="avatar">${esc(m[0].toUpperCase())}</span>
             <span class="m-email">${esc(m)}${m === user.email ? ' <span class="muted">(you)</span>' : ''}</span>
-            ${m === meta.ownerEmail ? '<span class="badge pub">Owner</span>' : '<span class="badge local">Can edit</span>'}
+            ${m === meta.ownerEmail ? '<span class="badge pub">Owner</span>'
+              : owner ? `<select class="role-sel" data-role="${esc(m)}" aria-label="Access for ${esc(m)}">${roleOptions(viewer ? 'view' : 'edit')}</select>`
+              : `<span class="badge ${viewer ? 'view' : 'local'}">${viewer ? 'View only' : 'Can edit'}</span>`}
             ${owner && m !== meta.ownerEmail ? `<button class="icon-btn" type="button" data-remove="${esc(m)}" title="Remove ${esc(m)}" aria-label="Remove ${esc(m)}">✕</button>` : ''}
-          </li>`).join('')}
+          </li>`;
+        }).join('')}
       </ul>
       ${owner ? `
         <form id="add-member" class="add-member" novalidate>
           <input type="email" name="email" placeholder="Or add by email: friend@gmail.com" autocomplete="off" aria-label="Collaborator's Google email" ${full ? 'disabled' : ''}>
+          <select class="role-sel" name="role" aria-label="Their access" ${full ? 'disabled' : ''}>${roleOptions('edit')}</select>
           <button class="btn ghost" type="submit" ${full ? 'disabled' : ''}>Add</button>
         </form>
-        <p class="fine">Use the email of their <strong>Google account</strong>. Members can view and edit the plan. Only you can add or remove people or delete the trip.</p>`
-        : `<p class="fine">${esc(meta.ownerEmail)} owns this trip and manages who's in it.</p>`}
+        <p class="fine">Use the email of their <strong>Google account</strong>. <strong>Can edit</strong>: change the plan. <strong>View only</strong>: see everything, and still tick stops, the checklist and expenses, but not change the plan. Only you can add or remove people, change access or delete the trip.</p>`
+        : `<p class="fine">${esc(meta.ownerEmail)} owns this trip and manages who's in it.${meta.viewerEmails.includes(user.email) ? ' You have <strong>view-only</strong> access: you can tick stops, use the checklist and log expenses, but not change the plan.' : ''}</p>`}
     </section>
 
     <section class="ed-card">
@@ -555,17 +979,35 @@ function renderMembers({ trip, meta }) {
     const email = String(new FormData(e.target).get('email') || '').trim().toLowerCase();
     if (!EMAIL.test(email)) { toast('Enter a valid email address.', 'bad'); return; }
     if (meta.memberEmails.includes(email)) { toast('They\'re already a member.', 'bad'); return; }
+    const viewOnly = new FormData(e.target).get('role') === 'view';
     try {
-      await cloud.setMembers(user, trip.id, [...meta.memberEmails, email]);
-      toast(`Added ${email}. Now send them the invite link.`, 'ok');
+      await cloud.setMembers(user, trip.id, [...meta.memberEmails, email], viewOnly ? [...meta.viewerEmails, email] : meta.viewerEmails);
+      toast(`Added ${email}${viewOnly ? ' (view only)' : ''}. Now send them the invite link.`, 'ok');
     } catch (err) { toast(err.message, 'bad'); }
   });
+  // Changing someone's access, or what link joiners get.
+  view.onchange = async (e) => {
+    const sel = e.target.closest('[data-role], [data-link-role]');
+    if (!sel) return;
+    const prev = sel.dataset.role ? (meta.viewerEmails.includes(sel.dataset.role) ? 'view' : 'edit') : meta.linkRole;
+    sel.disabled = true;
+    try {
+      if (sel.dataset.role) {
+        await cloud.setRole(user, trip.id, sel.dataset.role, sel.value);
+        toast(`${sel.dataset.role} ${sel.value === 'view' ? 'can now only view' : 'can now edit'} the plan`, 'ok');
+      } else {
+        await cloud.setLinkRole(user, trip.id, sel.value);
+        toast(`People who join with the link ${sel.value === 'view' ? 'can only view' : 'can edit'} the plan`, 'ok');
+      }
+    } catch (err) { sel.value = prev; toast(err.message, 'bad'); }
+    sel.disabled = false;
+  };
   view.onclick = async (e) => {
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.remove) {
       if (!(await ask(`Remove ${b.dataset.remove} from this trip?`, { detail: 'They lose access straight away.', ok: 'Remove', danger: true }))) return;
-      try { await cloud.setMembers(user, trip.id, meta.memberEmails.filter((m) => m !== b.dataset.remove)); toast('Removed', 'ok'); } catch (err) { toast(err.message, 'bad'); }
+      try { await cloud.setMembers(user, trip.id, meta.memberEmails.filter((m) => m !== b.dataset.remove), meta.viewerEmails); toast('Removed', 'ok'); } catch (err) { toast(err.message, 'bad'); }
     } else if (b.dataset.invite) {
       shareOrCopy(b.dataset.invite, `Join my trip “${trip.title}”`, 'Invite link copied');
     } else if ('sendCopy' in b.dataset) {
@@ -710,7 +1152,7 @@ async function route() {
   if (current === 'trip' && view !== 'trip') unmountTrip();
   if (current === 'edit') { editor?.dispose(); editor = null; }
   for (const off of cleanups.splice(0)) off();
-  window.scrollTo(0, 0);
+  window.scrollTo({ top: 0, behavior: 'instant' });
   try {
     switch (view) {
       case 'trip': return await showTrip(decodeURIComponent(arg));
@@ -718,6 +1160,8 @@ async function route() {
       case 'members': return await showMembers(decodeURIComponent(arg));
       case 'account': return showAccount();
       case 'import': return await showImport(arg);
+      case 'checklist': return await showChecklist(decodeURIComponent(arg));
+      case 'expenses': return await showExpenses(decodeURIComponent(arg));
       default: return showHome();
     }
   } catch (err) {

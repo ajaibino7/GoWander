@@ -4,6 +4,8 @@ import {
   THEMES, THEME_COLORS, TAG_LABELS, weekdayOf, shortDate, dayMonth, fmtRange,
 } from './util.js';
 import { nearbyPlaces, forStop, intentFor, GENERAL, CATS } from './nearby.js';
+import { tripWeather, forecastFrom } from './weather.js';
+import { tripLegs, bestMode } from './routing.js';
 
 /* ============================================================
    Test mode (only active via URL; see README):
@@ -50,7 +52,22 @@ export const state = {
   selectedStop: null,
   done: new Set(),
   doneBy: new Map(), // stop id → email of the member who marked it (shared trips)
+  weather: new Map(), // date → forecast (weather.js)
+  legs: new Map(), // stop id → road travel time from the previous place (routing.js)
 };
+
+// Weather and travel times load in the background and re-render when they arrive. They're
+// fetched again only when the dates, times or places change.
+let extrasSig = '';
+function loadExtras() {
+  const id = TRIP.id;
+  const sig = JSON.stringify([id, DAYS.map((d) => [d.date, d.stops.map((s) => [s.id, s.start, s.end, s.place.lat, s.place.lng])])]);
+  if (sig === extrasSig) return;
+  extrasSig = sig;
+  const days = DAYS;
+  tripWeather(TRIP).then((w) => { if (TRIP?.id === id) { state.weather = w; render(); } }, () => {});
+  tripLegs(days).then((l) => { if (TRIP?.id === id) { state.legs = l; render(); } }, () => {});
+}
 
 // Shared trips pass onDone so marks sync to all members; otherwise they stay on this device.
 let doneHook = null;
@@ -367,6 +384,7 @@ function renderTabs(ph) {
     <button class="tab theme-${d.theme}" role="tab" type="button" data-day="${d.n}" aria-selected="${d.n === state.selectedDay}">
       <div class="tn">${d.n}</div>
       <div class="td">${esc(d.label)}${d.n === todayN ? '<span class="today" title="Today"></span>' : ''}</div>
+      ${state.weather.has(d.date) ? `<div class="tw" title="${esc(state.weather.get(d.date).label)}">${state.weather.get(d.date).icon} ${state.weather.get(d.date).max}°</div>` : ''}
     </button>`).join('');
 }
 
@@ -376,12 +394,17 @@ function renderDay(t, ph) {
   if (!day) { el.className = 'day'; el.innerHTML = ''; return; }
   const isToday = ph.day === day;
   el.className = `day theme-${day.theme}`;
+  const wx = state.weather.get(day.date);
+  const wxLine = wx
+    ? `<div class="day-wx" title="Forecast for the day's main area">${wx.icon} ${esc(wx.label)} · ${wx.max}° / ${wx.min}°${wx.rain != null ? ` · 💧 ${wx.rain}%` : ''}</div>`
+    : (forecastFrom(day.date) > clock.dateKey(t) ? `<div class="day-wx soft">Forecast from ${esc(dayMonth(forecastFrom(day.date)))}</div>` : '');
 
   el.innerHTML = `
     <div class="day-band">
       <div class="num">${String(day.n).padStart(2, '0')}</div>
       <div class="eyebrow">Day ${day.n} · ${esc(day.weekday)}, ${esc(dayMonth(day.date))}</div>
       <h2>${esc(day.title || `Day ${day.n}`)}</h2>
+      ${wxLine}
     </div>
     <ol class="timeline">
       ${day.stops.map((s) => {
@@ -396,9 +419,10 @@ function renderDay(t, ph) {
           <div class="c">
             <div class="w">${esc(s.title)}${s.tag ? `<span class="tag ${s.tag}">${TAG_LABELS[s.tag]}</span>` : ''}${s.departure ? '<span class="tag deadline">Departure</span>' : ''}${ss === 'now' ? '<span class="tag nowtag">Now</span>' : ''}${here ? '<span class="tag heretag">You\'re here</span>' : ''}</div>
             ${s.note ? `<div class="n">${esc(s.note)}</div>` : ''}
-            <div class="m"><span>📍 ${esc(s.place.name)}${s.place.approx ? ' (approx.)' : ''}</span>${dist ? `<span>${dist} away</span>` : ''}${state.doneBy.has(s.id) ? `<span class="done-by">✓ ${esc(state.doneBy.get(s.id).split('@')[0])}</span>` : ''}</div>
+            <div class="m"><span>📍 ${esc(s.place.name)}${s.place.approx ? ' (approx.)' : ''}</span>${dist ? `<span>${dist} away</span>` : ''}${stopWeather(day, s)}${state.doneBy.has(s.id) ? `<span class="done-by">✓ ${esc(state.doneBy.get(s.id).split('@')[0])}</span>` : ''}</div>
+            ${legHtml(day, s)}
             ${state.selectedStop === s.id ? `
-              <div class="stop-actions">
+              <div class="stop-actions${justOpened === s.id ? ' opening' : ''}">
                 <a class="mini" href="${directionsUrl(s.place)}" target="_blank" rel="noopener">Directions</a>
                 <button class="mini" type="button" data-nearby="${s.id}">${intentFor(s).icon} ${esc(intentFor(s).button)}</button>
                 <button class="mini" type="button" data-done="${s.id}">${state.done.has(s.id) ? 'Undo done' : 'Mark done / skip'}</button>
@@ -408,6 +432,31 @@ function renderDay(t, ph) {
       }).join('')}
     </ol>
     ${day.notes?.length ? `<div class="notes">${day.notes.map((n) => `<div class="note ${n.type}"><b>${esc(n.title)}</b>${esc(n.text)}</div>`).join('')}</div>` : ''}`;
+}
+
+// The weather at the stop's start time (from the day's hourly forecast).
+function stopWeather(day, s) {
+  const h = state.weather.get(day.date)?.hours.get(s.start.slice(0, 2));
+  return h ? `<span class="m-wx" title="${esc(h.label)}${h.rain ? ` · ${h.rain}% chance of rain` : ''}">${h.icon} ${h.temp}°</span>` : '';
+}
+
+// How long it takes to get here from the previous place, by road — and a warning when the plan
+// doesn't leave enough time. For a travel stop the journey happens during the stop itself.
+function legHtml(day, s) {
+  const leg = state.legs.get(s.id);
+  if (!leg?.drive) return '';
+  const best = bestMode(leg);
+  const prev = day.stops[s.idx - 1];
+  const mins = Math.round(best.s / 60);
+  let warn = '';
+  if (prev) {
+    // Only flag real shortfalls: a short walk between back-to-back stops is normal planning.
+    const planned = Math.round(((s.startAt - prev.endAt) + (s.kind === 'travel' ? s.endAt - s.startAt : 0)) / 60000);
+    if (mins - Math.max(0, planned) >= 20) {
+      warn = ` <span class="leg-warn">· ${planned > 0 ? `only ${fmtDur(planned * 60000)} planned` : 'no time planned'}</span>`;
+    }
+  }
+  return `<div class="leg${warn ? ' tight' : ''}">${best.icon} ${fmtDur(best.s * 1000)} ${best.mode === 'walk' ? 'walk' : 'drive'} · ${fmtDist(best.m)}${warn}</div>`;
 }
 
 /* ---------- map ---------- */
@@ -655,6 +704,7 @@ async function initLocation() {
    Events (bound once)
    ============================================================ */
 let wired = false;
+let justOpened = null; // the stop whose buttons should ease in on this render
 function wire() {
   if (wired) return;
   wired = true;
@@ -679,17 +729,28 @@ function wire() {
     }
     const tab = e.target.closest('[data-day]');
     if (tab) {
+      const from = state.selectedDay;
       state.selectedDay = Number(tab.dataset.day);
       state.selectedStop = null;
       closeNearby();
       render();
+      // Slide the day in from the side of the tab that was picked.
+      if (from != null && from !== state.selectedDay) {
+        const day = $('day');
+        day.classList.remove('slide-next', 'slide-prev');
+        void day.offsetWidth;
+        day.classList.add(state.selectedDay > from ? 'slide-next' : 'slide-prev');
+        tab.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      }
       return;
     }
     const stop = e.target.closest('[data-stop]');
     if (stop && !e.target.closest('a')) {
       const id = stop.dataset.stop;
       state.selectedStop = state.selectedStop === id ? null : id;
+      justOpened = state.selectedStop;
       render();
+      justOpened = null; // only this render eases the buttons in, not the clock ticks after it
       const s = DAYS.flatMap((d) => d.stops).find((x) => x.id === id);
       if (state.selectedStop && map && s) {
         map.setView([s.place.lat, s.place.lng], Math.max(map.getZoom(), 15));
@@ -726,6 +787,7 @@ export function mountTrip(trip, { onDone = null } = {}) {
     lastMapSig = '';
     if (!DAYS.some((d) => d.n === state.selectedDay)) state.selectedDay = null;
     render();
+    loadExtras();
     return;
   }
   state.selectedDay = null;
@@ -733,6 +795,9 @@ export function mountTrip(trip, { onDone = null } = {}) {
   closeNearby();
   state.done = onDone ? new Set() : loadDone();
   state.doneBy = new Map();
+  state.weather = new Map();
+  state.legs = new Map();
+  loadExtras();
   refitMap();
   $('site-foot').textContent = `Times are in trip time (${clock.label}). Your location stays on your device and is never uploaded.`;
 
@@ -751,6 +816,7 @@ export function mountTrip(trip, { onDone = null } = {}) {
 
 export function unmountTrip() {
   TRIP = null;
+  extrasSig = '';
   closeNearby();
   clearInterval(timer);
   timer = null;

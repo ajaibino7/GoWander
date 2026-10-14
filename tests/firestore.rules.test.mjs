@@ -151,6 +151,70 @@ test('members can still edit the plan while link joining is on', async () => {
   await assertSucceeds(updateDoc(trip(FRIEND), { title: 'Goa 2', ...stamp(FRIEND) }));
 });
 
+/* ---------- roles: view-only members ---------- */
+const makeViewer = () => updateDoc(trip(OWNER), { memberEmails: [OWNER.email, FRIEND.email], viewerEmails: [FRIEND.email], ...stamp(OWNER) });
+
+test('the owner can make a member view-only and back', async () => {
+  await addFriend();
+  await assertSucceeds(updateDoc(trip(OWNER), { viewerEmails: [FRIEND.email], ...stamp(OWNER) }));
+  await assertSucceeds(updateDoc(trip(OWNER), { viewerEmails: [], ...stamp(OWNER) }));
+});
+test('a view-only member can read but not edit the plan', async () => {
+  await makeViewer();
+  await assertSucceeds(getDoc(trip(FRIEND)));
+  await assertFails(updateDoc(trip(FRIEND), { title: 'changed', ...stamp(FRIEND) }));
+});
+test('a view-only member cannot make themselves an editor', async () => {
+  await makeViewer();
+  await assertFails(updateDoc(trip(FRIEND), { viewerEmails: [], ...stamp(FRIEND) }));
+});
+test('editors cannot change roles or link settings', async () => {
+  await updateDoc(trip(OWNER), { memberEmails: [OWNER.email, FRIEND.email, STRANGER.email], viewerEmails: [STRANGER.email], ...stamp(OWNER) });
+  await assertFails(updateDoc(trip(FRIEND), { viewerEmails: [], ...stamp(FRIEND) }));
+  await assertFails(updateDoc(trip(FRIEND), { linkRole: 'view', ...stamp(FRIEND) }));
+});
+test('only members can be view-only, and never the owner', async () => {
+  await addFriend();
+  await assertFails(updateDoc(trip(OWNER), { viewerEmails: [STRANGER.email], ...stamp(OWNER) }));
+  await assertFails(updateDoc(trip(OWNER), { viewerEmails: [OWNER.email], ...stamp(OWNER) }));
+  await assertFails(updateDoc(trip(OWNER), { linkRole: 'admin', ...stamp(OWNER) }));
+});
+test('a view-only member can still tick stops, use the checklist and log expenses', async () => {
+  await makeViewer();
+  await assertSucceeds(tick(FRIEND));
+  await assertSucceeds(setDoc(doc(db(FRIEND), 'trips', 't1', 'checklist', 'v1'), { text: 'Hat', list: 'packing', done: false, doneBy: '', createdBy: FRIEND.email, createdAt: serverTimestamp(), ...stamp(FRIEND) }));
+  await assertSucceeds(setDoc(doc(db(FRIEND), 'trips', 't1', 'expenses', 'v1'), {
+    title: 'Snacks', amount: 200, currency: 'INR', paidBy: FRIEND.email, split: [OWNER.email, FRIEND.email], date: '2026-10-17', kind: 'expense',
+    createdBy: FRIEND.email, createdAt: serverTimestamp(), ...stamp(FRIEND),
+  }));
+});
+test('a view-only member cannot change the cover', async () => {
+  await makeViewer();
+  await assertFails(setDoc(doc(db(FRIEND), 'trips', 't1', 'media', 'cover'), { data: 'data:image/jpeg;base64,AAAA', ...stamp(FRIEND) }));
+  await assertSucceeds(setDoc(doc(db(OWNER), 'trips', 't1', 'media', 'cover'), { data: 'data:image/jpeg;base64,AAAA', ...stamp(OWNER) }));
+  await assertFails(deleteDoc(doc(db(FRIEND), 'trips', 't1', 'media', 'cover')));
+});
+test('a view-only member can leave, and leaves the viewer list too', async () => {
+  await makeViewer();
+  await assertFails(updateDoc(trip(FRIEND), { memberEmails: arrayRemove(FRIEND.email), ...stamp(FRIEND) })); // still listed as viewer
+  await assertSucceeds(updateDoc(trip(FRIEND), { memberEmails: arrayRemove(FRIEND.email), viewerEmails: arrayRemove(FRIEND.email), ...stamp(FRIEND) }));
+  await assertFails(getDoc(trip(FRIEND)));
+});
+test('strangers cannot touch a trip by pretending to leave it', async () => {
+  await assertFails(updateDoc(trip(STRANGER), { ...stamp(STRANGER) }));
+});
+test('link joiners become view-only when the owner chose that', async () => {
+  await updateDoc(trip(OWNER), { linkJoin: true, linkRole: 'view', ...stamp(OWNER) });
+  await assertFails(join(STRANGER)); // must add themselves to the viewers as well
+  await assertSucceeds(updateDoc(trip(STRANGER), { memberEmails: arrayUnion(STRANGER.email), viewerEmails: arrayUnion(STRANGER.email), ...stamp(STRANGER) }));
+  await assertFails(updateDoc(trip(STRANGER), { title: 'mine', ...stamp(STRANGER) }));
+});
+test('link joiners cannot pick view-only access the owner did not choose', async () => {
+  await updateDoc(trip(OWNER), { linkJoin: true, ...stamp(OWNER) });
+  await assertFails(updateDoc(trip(STRANGER), { memberEmails: arrayUnion(STRANGER.email), viewerEmails: arrayUnion(STRANGER.email), ...stamp(STRANGER) }));
+  await assertSucceeds(join(STRANGER));
+});
+
 /* ---------- shared progress (done / skipped stops) ---------- */
 const progress = (u) => doc(db(u), 'trips', 't1', 'state', 'progress');
 const tick = (u, done = { s1: u.email }) => setDoc(progress(u), { done, ...stamp(u) }, { merge: true });
@@ -209,6 +273,65 @@ test('the cover must be an image data URL with nothing extra', async () => {
   await assertFails(setCover(OWNER, 'data:text/html;base64,PHNjcmlwdD4='));
   await assertFails(setDoc(cover(OWNER), { data: img(), junk: 1, ...stamp(OWNER) }));
   await assertFails(setDoc(doc(db(OWNER), 'trips', 't1', 'media', 'other'), { data: img(), ...stamp(OWNER) }));
+});
+
+/* ---------- shared checklist ---------- */
+const item = (u, id = 'i1') => doc(db(u), 'trips', 't1', 'checklist', id);
+const newItem = (u, extra = {}) => ({ text: 'Sunscreen', list: 'packing', done: false, doneBy: '', createdBy: u.email, createdAt: serverTimestamp(), ...stamp(u), ...extra });
+
+test('members can add, tick and remove checklist items', async () => {
+  await addFriend();
+  await assertSucceeds(setDoc(item(FRIEND), newItem(FRIEND)));
+  await assertSucceeds(getDoc(item(OWNER)));
+  await assertSucceeds(updateDoc(item(OWNER), { done: true, doneBy: OWNER.email, ...stamp(OWNER) }));
+  await assertSucceeds(deleteDoc(item(OWNER)));
+});
+test('strangers cannot see or change the checklist', async () => {
+  await setDoc(item(OWNER), newItem(OWNER));
+  await assertFails(getDoc(item(STRANGER)));
+  await assertFails(setDoc(item(STRANGER, 'i2'), newItem(STRANGER)));
+  await assertFails(updateDoc(item(STRANGER), { done: true, ...stamp(STRANGER) }));
+});
+test('checklist items are validated and keep their author', async () => {
+  await addFriend();
+  await assertFails(setDoc(item(OWNER), newItem(OWNER, { list: 'shopping' })));
+  await assertFails(setDoc(item(OWNER), newItem(OWNER, { text: '' })));
+  await assertFails(setDoc(item(OWNER), newItem(OWNER, { createdBy: FRIEND.email })));
+  await setDoc(item(OWNER), newItem(OWNER));
+  await assertFails(updateDoc(item(FRIEND), { createdBy: FRIEND.email, ...stamp(FRIEND) }));
+});
+
+/* ---------- shared expenses ---------- */
+const exp = (u, id = 'e1') => doc(db(u), 'trips', 't1', 'expenses', id);
+const newExp = (u, extra = {}) => ({
+  title: 'Dinner', amount: 1200, currency: 'INR', paidBy: u.email, split: [OWNER.email, FRIEND.email], date: '2026-10-17', kind: 'expense',
+  createdBy: u.email, createdAt: serverTimestamp(), ...stamp(u), ...extra,
+});
+
+test('members can log, edit and delete expenses', async () => {
+  await addFriend();
+  await assertSucceeds(setDoc(exp(FRIEND), newExp(FRIEND)));
+  await assertSucceeds(getDoc(exp(OWNER)));
+  await assertSucceeds(updateDoc(exp(OWNER), { amount: 1500, ...stamp(OWNER) }));
+  await assertSucceeds(setDoc(exp(OWNER, 'e2'), newExp(OWNER, { title: 'Paid back', kind: 'settlement', paidBy: OWNER.email, split: [FRIEND.email] })));
+  await assertSucceeds(deleteDoc(exp(OWNER)));
+});
+test('strangers cannot see or log expenses', async () => {
+  await addFriend();
+  await setDoc(exp(OWNER), newExp(OWNER));
+  await assertFails(getDoc(exp(STRANGER)));
+  await assertFails(setDoc(exp(STRANGER, 'e2'), newExp(STRANGER, { paidBy: OWNER.email })));
+});
+test('payer and split must be trip members, and amounts must be sensible', async () => {
+  await addFriend();
+  await assertFails(setDoc(exp(OWNER), newExp(OWNER, { paidBy: STRANGER.email })));
+  await assertFails(setDoc(exp(OWNER), newExp(OWNER, { split: [OWNER.email, STRANGER.email] })));
+  await assertFails(setDoc(exp(OWNER), newExp(OWNER, { split: [] })));
+  await assertFails(setDoc(exp(OWNER), newExp(OWNER, { amount: 0 })));
+  await assertFails(setDoc(exp(OWNER), newExp(OWNER, { amount: '100' })));
+  await assertFails(setDoc(exp(OWNER), newExp(OWNER, { currency: 'rupees' })));
+  await assertFails(setDoc(exp(OWNER), newExp(OWNER, { kind: 'gift' })));
+  await assertFails(setDoc(exp(OWNER), newExp(OWNER, { junk: 1 })));
 });
 
 /* ---------- deleting ---------- */

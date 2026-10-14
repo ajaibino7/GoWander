@@ -6,7 +6,7 @@
   <title>GoWander</title>
   <meta name="description" content="Plan trips day by day and follow them live with location-aware status.">
   <meta name="theme-color" content="#13294b">
-  <meta name="app-version" content="d378d8b9">
+  <meta name="app-version" content="be7fe47e">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/favicon-64.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -15,8 +15,8 @@
   <meta name="application-name" content="GoWander">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="css/styles.css?v=76e2c327de">
-  <link rel="stylesheet" href="css/app.css?v=8e1d28f273">
+  <link rel="stylesheet" href="css/styles.css?v=8b049819ca">
+  <link rel="stylesheet" href="css/app.css?v=99ffba6b58">
 </head>
 <body>
   <div id="sim-banner" class="sim-banner" hidden></div>
@@ -67,6 +67,7 @@
           </div>
           <div id="status-body"></div>
         </section>
+        <nav class="trip-tools" id="trip-tools" aria-label="Trip tools"></nav>
         <nav class="tabs" id="tabs" role="tablist" aria-label="Trip days"></nav>
         <section class="day" id="day"></section>
       </div>
@@ -86,6 +87,8 @@
     <section id="view-members" class="view wrap-narrow" hidden></section>
     <section id="view-settings" class="view wrap-narrow" hidden></section>
     <section id="view-import" class="view wrap-narrow" hidden></section>
+    <section id="view-checklist" class="view wrap-narrow" hidden></section>
+    <section id="view-expenses" class="view wrap-narrow" hidden></section>
   </main>
 
   <footer class="site-foot" id="site-foot"></footer>
@@ -97,20 +100,24 @@
   {
     "imports": {
       "./js/autocover.js": "./js/autocover.js?v=8afe28294f",
-      "./js/cloud.js": "./js/cloud.js?v=2929a346fb",
-      "./js/editor.js": "./js/editor.js?v=99ac93ace9",
+      "./js/calendar.js": "./js/calendar.js?v=2878c14752",
+      "./js/cloud.js": "./js/cloud.js?v=3956b81144",
+      "./js/editor.js": "./js/editor.js?v=5b40e8f392",
       "./js/firebase-config.js": "./js/firebase-config.js?v=caeca71f59",
-      "./js/live.js": "./js/live.js?v=fafc34d339",
-      "./js/main.js": "./js/main.js?v=0408d1fe5a",
+      "./js/live.js": "./js/live.js?v=099883dea9",
+      "./js/main.js": "./js/main.js?v=cb0cdaff7b",
       "./js/nearby.js": "./js/nearby.js?v=8656ebc47c",
+      "./js/offline.js": "./js/offline.js?v=8a40b2d162",
       "./js/placepicker.js": "./js/placepicker.js?v=3594d48934",
+      "./js/routing.js": "./js/routing.js?v=165c00c8ee",
       "./js/store.js": "./js/store.js?v=085676b855",
       "./js/testkit.js": "./js/testkit.js?v=cd1f1e95d1",
-      "./js/util.js": "./js/util.js?v=80527bd589"
+      "./js/util.js": "./js/util.js?v=80527bd589",
+      "./js/weather.js": "./js/weather.js?v=f3ec1a4ad6"
     }
   }
   </script>
   <!-- /build:importmap -->
-  <script type="module" src="js/main.js?v=0408d1fe5a"></script>
+  <script type="module" src="js/main.js?v=cb0cdaff7b"></script>
 </body>
 </html>

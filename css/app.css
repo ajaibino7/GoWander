@@ -98,10 +98,11 @@
 
 /* ---------- forms ---------- */
 .ed-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px; min-width: 0; }
+.ed-card > * { min-width: 0; } /* let long content (emails, links) wrap instead of widening the card */
 .fld { display: grid; gap: 4px; min-width: 0; }
 .fld > span { font-size: 12px; font-weight: 700; letter-spacing: .04em; color: var(--muted); }
 .fld small { color: var(--faint); font-size: 12px; }
-.editor input, .editor select, .editor textarea, .settings-form input, .modal input, .modal select {
+.editor input, .editor select, .editor textarea, .form input, .form select, .settings-form input, .modal input, .modal select {
   font: inherit; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 9px;
   padding: 8px 10px; width: 100%; min-width: 0;
 }
@@ -119,7 +120,7 @@
   .editor input[type="date"]::-webkit-datetime-edit,
   .editor input[type="time"]::-webkit-datetime-edit { padding: 0; }
 }
-.editor input:focus, .editor select:focus, .editor textarea:focus, .settings-form input:focus, .modal input:focus, .modal select:focus {
+.editor input:focus, .editor select:focus, .editor textarea:focus, .form input:focus, .form select:focus, .settings-form input:focus, .modal input:focus, .modal select:focus {
   outline: 2px solid color-mix(in srgb, var(--sea) 60%, transparent); outline-offset: 0; border-color: var(--sea);
 }
 .grid2 { display: grid; gap: 10px; grid-template-columns: 1fr; }
@@ -296,3 +297,173 @@ body:has(.ed-bar) .toaster { bottom: calc(80px + env(safe-area-inset-bottom)); }
 .toast.ask { border-left-color: var(--coral); } .toast.ask .t-icon { background: var(--coral); }
 .toast.ask.danger { border-left-color: var(--bad); } .toast.ask.danger .t-icon { background: var(--bad); }
 .toast.ask .t-msg { font-weight: 600; }
+
+/* ---------- trip tools (trip page) ---------- */
+.trip-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.trip-tools:empty { display: none; }
+.tool {
+  display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 8px 12px;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); text-decoration: none; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+  transition: border-color .15s, color .15s, transform .15s;
+}
+.tool .ic { width: 18px; height: 18px; color: var(--accent); }
+.tool:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.tool:disabled { cursor: progress; opacity: .85; transform: none; }
+.tool.ok .ic { color: var(--ok); }
+
+/* ---------- shared checklist ---------- */
+.cl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.cl-bar { height: 6px; border-radius: 99px; background: var(--surface-2); overflow: hidden; }
+.cl-bar span { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green), var(--ok)); border-radius: 99px; transition: width .3s; }
+.cl-items { list-style: none; margin: 0; padding: 0; display: grid; }
+.cl-item { display: flex; align-items: center; gap: 8px; padding: 6px 2px; border-bottom: 1px solid var(--line); min-width: 0; }
+.cl-item:last-child { border-bottom: 0; }
+.cl-item label { flex: 1; display: flex; align-items: center; gap: 10px; cursor: pointer; min-width: 0; }
+.cl-item input[type="checkbox"] { width: 20px; height: 20px; flex: 0 0 auto; accent-color: var(--ok); }
+.cl-text { overflow-wrap: anywhere; }
+.cl-item.done .cl-text { text-decoration: line-through; color: var(--muted); }
+.cl-by { font-size: 11px; color: var(--ok); white-space: nowrap; }
+.cl-empty { padding: 4px 2px; }
+.cl-add { display: flex; gap: 8px; }
+.cl-add input { flex: 1; }
+.cl-ideas { display: flex; flex-wrap: wrap; gap: 6px; }
+.cl-ideas:empty { display: none; }
+.chip-btn {
+  font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 99px; cursor: pointer;
+  border: 1px dashed var(--line); background: transparent; color: var(--muted);
+}
+.chip-btn:hover { border-style: solid; border-color: var(--accent); color: var(--accent); }
+
+/* ---------- shared expenses ---------- */
+.ex-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ex-stats .stat { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.ex-stats .k { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.ex-stats .v { font-family: var(--serif); font-size: 21px; margin-top: 2px; overflow-wrap: anywhere; }
+.ex-stats .stat.pos .v, .ex-bal .pos { color: var(--ok); }
+.ex-stats .stat.neg .v, .ex-bal .neg { color: var(--bad); }
+.ex-bal, .ex-moves, .ex-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.ex-bal li, .ex-moves li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: 14px; flex-wrap: wrap; }
+.ex-bal li:last-child, .ex-moves li:last-child { border-bottom: 0; }
+.ex-bal li > span:first-child, .ex-moves li > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.ex-move-r { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
+.ex-empty { text-align: center; padding: 12px 8px; }
+.ex-form { display: grid; gap: 12px; }
+.ex-amt { display: grid; grid-template-columns: minmax(0, 1fr) 96px; gap: 8px; }
+.ex-split { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.ex-who { color: var(--ink); font-size: 14px; }
+.ex-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--line); min-width: 0; }
+.ex-row:last-child { border-bottom: 0; }
+.ex-ic { font-size: 20px; flex: 0 0 auto; }
+.ex-main { flex: 1; min-width: 0; display: grid; }
+.ex-title { font-weight: 600; overflow-wrap: anywhere; }
+.ex-meta { font-size: 12px; color: var(--muted); }
+.ex-amtv { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ex-row.settle .ex-amtv { color: var(--ok); }
+.ex-actions { display: inline-flex; gap: 4px; }
+.ex-actions .icon-link { width: 30px; height: 30px; }
+@media (max-width: 520px) {
+  .ex-stats { grid-template-columns: 1fr 1fr; }
+  .ex-stats .stat:last-child { grid-column: 1 / -1; }
+}
+
+/* ============================================================
+   Motion — iOS-style springs. Screens slide in from the side you're heading, lists rise in
+   one after another as a screen opens, things you press give a little, and sheets slide up.
+   Everything here is switched off for "Reduce motion" (bottom of this section).
+   ============================================================ */
+:root {
+  --spring: cubic-bezier(.32, .72, 0, 1); /* the iOS sheet / navigation curve */
+  --spring-pop: cubic-bezier(.34, 1.56, .64, 1); /* a small overshoot, for things that "land" */
+}
+html { -webkit-tap-highlight-color: transparent; }
+
+/* Screen transitions. The editor's save bar is position: fixed, so it's left out — a moving
+   ancestor would carry it along. */
+@keyframes view-in-forward { from { opacity: 0; transform: translate3d(32px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes view-in-back { from { opacity: 0; transform: translate3d(-32px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes hero-in-forward { from { opacity: 0; transform: translate3d(18px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes hero-in-back { from { opacity: 0; transform: translate3d(-18px, 0, 0); } to { opacity: 1; transform: none; } }
+.view.enter-forward > :not(.editor), .view.enter-forward > .editor > :not(.ed-bar) { animation: view-in-forward .52s var(--spring) both; }
+.view.enter-back > :not(.editor), .view.enter-back > .editor > :not(.ed-bar) { animation: view-in-back .52s var(--spring) both; }
+.hero-inner.enter-forward > * { animation: hero-in-forward .5s var(--spring) both; }
+.hero-inner.enter-back > * { animation: hero-in-back .5s var(--spring) both; }
+
+/* Lists rise in one after another, only while a screen is opening (live refreshes don't replay it). */
+@keyframes rise-in { from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.985); } to { opacity: 1; transform: none; } }
+.view.entering :is(.trip-list > *, .timeline > .tl, .cl-items > li, .ex-list > li, .ex-moves > li, .members > li) {
+  animation: rise-in .55s var(--spring) both;
+}
+.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(2) { animation-delay: 40ms; }
+.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(3) { animation-delay: 80ms; }
+.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(4) { animation-delay: 120ms; }
+.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(5) { animation-delay: 160ms; }
+.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(6) { animation-delay: 200ms; }
+.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(7) { animation-delay: 240ms; }
+.view.entering :is(.trip-list, .timeline, .cl-items, .ex-list, .ex-moves, .members) > :nth-child(n+8) { animation-delay: 280ms; }
+
+/* Switching day tabs slides the day in from the side of the tab you picked. */
+@keyframes day-next { from { opacity: 0; transform: translate3d(36px, 0, 0); } to { opacity: 1; transform: none; } }
+@keyframes day-prev { from { opacity: 0; transform: translate3d(-36px, 0, 0); } to { opacity: 1; transform: none; } }
+.day.slide-next { animation: day-next .45s var(--spring) both; }
+.day.slide-prev { animation: day-prev .45s var(--spring) both; }
+.tab { transition: background-color .3s var(--spring), border-color .3s var(--spring), color .3s var(--spring), transform .3s var(--spring); }
+
+/* Press feedback: things give a little under your finger, then spring back. */
+:is(.btn, .tool, .hn-btn, .tab, .mini, .icon-btn, .icon-link, .chip-btn, .nb-chip, .hero-pill, .place-btn, .link-btn, .loc-btn, .t-btn, .google) {
+  transition: transform .35s var(--spring), background-color .2s, border-color .2s, color .2s, box-shadow .2s, filter .2s, opacity .2s;
+}
+:is(.btn, .tool, .hn-btn, .tab, .mini, .icon-btn, .icon-link, .chip-btn, .nb-chip, .hero-pill, .place-btn, .link-btn, .loc-btn, .t-btn, .google):active:not(:disabled) {
+  transform: scale(.95); transition-duration: .1s;
+}
+.trip-card { transition: transform .4s var(--spring), box-shadow .4s var(--spring); }
+.trip-card:active { transform: scale(.98); transition-duration: .12s; }
+.tl { transition: background-color .25s; }
+.tl:active { background: var(--surface-2); }
+
+/* Opening a stop eases its buttons in; the nearby panel and expanded content slide up softly. */
+@keyframes fade-up { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
+.stop-actions.opening, .nearby:not([hidden]) { animation: fade-up .4s var(--spring) both; }
+.samples[open] > .trip-list { animation: fade-up .45s var(--spring) both; }
+
+/* Ticking a checklist item: the box pops, the text eases to struck-through. */
+@keyframes tick { 0% { transform: scale(1); } 40% { transform: scale(1.28); } 100% { transform: scale(1); } }
+.cl-item.pop input[type="checkbox"] { animation: tick .45s var(--spring-pop); }
+.cl-text { transition: color .3s; }
+
+/* Toasts spring up from the bottom. */
+.toast { transform: translate3d(0, 24px, 0) scale(.95); transition: opacity .25s ease, transform .55s var(--spring-pop); }
+.toast.in { transform: none; }
+.toast.out { opacity: 0; transform: translate3d(0, 12px, 0) scale(.96); transition: opacity .2s ease, transform .25s ease; }
+
+/* Sheets: on phones the picker slides up from the bottom like an iOS sheet; on wider screens it
+   zooms in gently. The backdrop fades. */
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-up { from { transform: translate3d(0, 100%, 0); } to { transform: none; } }
+@keyframes card-in { from { opacity: 0; transform: translate3d(0, 10px, 0) scale(.96); } to { opacity: 1; transform: none; } }
+.modal:not([hidden]) { animation: backdrop-in .25s ease both; }
+.modal:not([hidden]) > .modal-card { animation: card-in .45s var(--spring) both; }
+@media (max-width: 640px) {
+  .modal { place-items: end center; padding: 0; }
+  .modal-card { width: 100%; border-radius: 22px 22px 0 0; max-height: 92dvh; padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .modal:not([hidden]) > .modal-card { animation: sheet-up .55s var(--spring) both; }
+  .modal-card::before { content: ''; justify-self: center; width: 38px; height: 5px; border-radius: 99px; background: var(--line); margin: -4px 0 2px; }
+}
+
+/* Numbers and bars that change glide instead of jumping. */
+.cl-bar span, .progress span { transition: width .6s var(--spring); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* ---------- roles ---------- */
+.badge.view { background: var(--info-bg); color: var(--info); }
+.role-sel { font: inherit; font-size: 12px; font-weight: 600; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 99px; padding: 4px 8px; cursor: pointer; }
+.role-line { margin-top: 4px; }
+.role-line .role-sel { justify-self: start; font-size: 13px; padding: 6px 10px; }
+.add-member .role-sel { flex: 0 0 auto; border-radius: 9px; }
+.hn-static { cursor: default; }

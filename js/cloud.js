@@ -94,6 +94,8 @@ function fromDoc(snap) {
       ownerEmail: d.ownerEmail,
       memberEmails: Array.isArray(d.memberEmails) ? d.memberEmails : [],
       linkJoin: d.linkJoin === true,
+      viewerEmails: Array.isArray(d.viewerEmails) ? d.viewerEmails : [], // view-only members
+      linkRole: d.linkRole === 'view' ? 'view' : 'edit', // what people joining by link become
       updatedAtMs: d.updatedAt?.toMillis?.() ?? 0, // 0 while our own write is still pending
       updatedBy: d.updatedBy || '',
       pending: snap.metadata.hasPendingWrites,
@@ -190,9 +192,26 @@ export async function updateTrip(user, id, trip, baseMs, { force = false } = {})
   await commit(F.updateDoc(ref, data));
 }
 
-export async function setMembers(user, id, emails) {
+// Owner only. viewers = the view-only members (kept to people still in the trip).
+export async function setMembers(user, id, emails, viewers = []) {
   const { db, F } = await init();
-  await commit(F.updateDoc(F.doc(db, 'trips', id), { memberEmails: emails, updatedAt: F.serverTimestamp(), updatedBy: user.email }));
+  await commit(F.updateDoc(F.doc(db, 'trips', id), {
+    memberEmails: emails, viewerEmails: viewers.filter((v) => emails.includes(v)), updatedAt: F.serverTimestamp(), updatedBy: user.email,
+  }));
+}
+
+// Owner only: 'view' makes a member view-only, 'edit' lets them change the plan.
+export async function setRole(user, id, email, role) {
+  const { db, F } = await init();
+  await commit(F.updateDoc(F.doc(db, 'trips', id), {
+    viewerEmails: role === 'view' ? F.arrayUnion(email) : F.arrayRemove(email), updatedAt: F.serverTimestamp(), updatedBy: user.email,
+  }));
+}
+
+// Owner only: what people who join with the link become.
+export async function setLinkRole(user, id, role) {
+  const { db, F } = await init();
+  await commit(F.updateDoc(F.doc(db, 'trips', id), { linkRole: role, updatedAt: F.serverTimestamp(), updatedBy: user.email }));
 }
 
 // Owner only: lets anyone who has the trip's link add themselves as a member.
@@ -205,8 +224,17 @@ export async function setLinkJoin(user, id, on) {
 export async function joinTrip(user, id) {
   if (!navigator.onLine) throw new Error('You\'re offline. Connect to the internet to join this trip.');
   const { db, F } = await init();
+  const ref = F.doc(db, 'trips', id);
+  const stamp = { updatedAt: F.serverTimestamp(), updatedBy: user.email };
   try {
-    await F.updateDoc(F.doc(db, 'trips', id), { memberEmails: F.arrayUnion(user.email), updatedAt: F.serverTimestamp(), updatedBy: user.email });
+    // Someone outside the trip can't read whether link joiners can edit or only view, so try
+    // joining as an editor first; if the owner chose view-only, join as a viewer instead.
+    try {
+      await F.updateDoc(ref, { memberEmails: F.arrayUnion(user.email), ...stamp });
+    } catch (e) {
+      if (e?.code !== 'permission-denied') throw e;
+      await F.updateDoc(ref, { memberEmails: F.arrayUnion(user.email), viewerEmails: F.arrayUnion(user.email), ...stamp });
+    }
   } catch (e) {
     if (e?.code === 'permission-denied') throw new Error('This trip isn\'t open to join by link, or it\'s full. Ask the owner to turn on “Anyone with the link can join”.');
     if (e?.code === 'not-found') throw new Error('This trip no longer exists.');
@@ -216,13 +244,22 @@ export async function joinTrip(user, id) {
 
 export async function leaveTrip(user, id) {
   const { db, F } = await init();
-  await commit(F.updateDoc(F.doc(db, 'trips', id), { memberEmails: F.arrayRemove(user.email), updatedAt: F.serverTimestamp(), updatedBy: user.email }));
+  await commit(F.updateDoc(F.doc(db, 'trips', id), {
+    memberEmails: F.arrayRemove(user.email), viewerEmails: F.arrayRemove(user.email), updatedAt: F.serverTimestamp(), updatedBy: user.email,
+  }));
 }
 
 export async function deleteTrip(id) {
   const { db, F } = await init();
   try { await commit(F.deleteDoc(progressRef(F, db, id))); } catch { /* no progress yet */ }
   try { await commit(F.deleteDoc(coverRef(F, db, id))); } catch { /* no cover */ }
+  // Firestore keeps a deleted document's subcollections, so clear the shared lists first.
+  for (const sub of ['checklist', 'expenses']) {
+    try {
+      const snap = await F.getDocs(F.collection(db, 'trips', id, sub));
+      await Promise.all(snap.docs.map((d) => commit(F.deleteDoc(d.ref))));
+    } catch { /* nothing there */ }
+  }
   await commit(F.deleteDoc(F.doc(db, 'trips', id)));
 }
 
@@ -245,6 +282,48 @@ export async function setCover(user, id, dataUrl) {
   await commit(dataUrl
     ? F.setDoc(ref, { data: dataUrl, updatedBy: user.email, updatedAt: F.serverTimestamp() })
     : F.deleteDoc(ref));
+}
+
+/* ============================================================
+   Shared checklist (packing + to-dos) and expenses — one document per item, so members can
+   add and tick things at the same time without overwriting each other. Both work offline:
+   writes queue and sync when the signal comes back.
+   ============================================================ */
+const toMs = (ts) => ts?.toMillis?.() ?? Date.now(); // pending own writes have no server time yet
+
+// cb([{ id, ...data, createdMs }]) now and on every change by any member.
+export async function watchList(id, sub, cb, onError) {
+  const { db, F } = await init();
+  return F.onSnapshot(F.collection(db, 'trips', id, sub),
+    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data(), createdMs: toMs(d.data().createdAt) }))),
+    (e) => onError?.(friendly(e)));
+}
+
+export async function addChecklistItem(user, id, list, text) {
+  const { db, F } = await init();
+  await commit(F.addDoc(F.collection(db, 'trips', id, 'checklist'), {
+    text, list, done: false, doneBy: '',
+    createdBy: user.email, createdAt: F.serverTimestamp(), updatedBy: user.email, updatedAt: F.serverTimestamp(),
+  }));
+}
+
+export async function updateChecklistItem(user, id, itemId, fields) {
+  const { db, F } = await init();
+  await commit(F.updateDoc(F.doc(db, 'trips', id, 'checklist', itemId), { ...fields, updatedBy: user.email, updatedAt: F.serverTimestamp() }));
+}
+
+// expense: { title, amount, currency, paidBy, split, date, kind }. Pass expenseId to edit one.
+export async function saveExpense(user, id, expense, expenseId = null) {
+  const { db, F } = await init();
+  const stamp = { updatedBy: user.email, updatedAt: F.serverTimestamp() };
+  await commit(expenseId
+    ? F.updateDoc(F.doc(db, 'trips', id, 'expenses', expenseId), { ...expense, ...stamp })
+    : F.addDoc(F.collection(db, 'trips', id, 'expenses'), { ...expense, createdBy: user.email, createdAt: F.serverTimestamp(), ...stamp }));
+}
+
+export async function deleteListItem(id, sub, itemId) {
+  const { db, F } = await init();
+  await commit(F.deleteDoc(F.doc(db, 'trips', id, sub, itemId)));
 }
 
 /* ============================================================

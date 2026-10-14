@@ -1,5 +1,5 @@
 // Trip editor: trip details, days, stops (with locations), notes, and fixed departures.
-import { esc, ask, toast, KIND_LABELS, TAG_LABELS, NOTE_LABELS, toMin, fromMin, addDays, weekdayOf, makeClock, DEFAULT_TZ } from './util.js';
+import { esc, ask, toast, KIND_LABELS, TAG_LABELS, NOTE_LABELS, toMin, fromMin, addDays, weekdayOf, shortDate, makeClock, DEFAULT_TZ } from './util.js';
 import { openPlacePicker } from './placepicker.js';
 import { newStopId } from './store.js';
 
@@ -150,6 +150,10 @@ export function mountEditor(el, trip, opts) {
             📍 ${s.place ? `${esc(s.place.name)} <small>· ${s.place.radius < 1000 ? `${s.place.radius} m` : `${s.place.radius / 1000} km`}</small>` : 'Set location'}
           </button>
           <select data-f="${p}.tag" aria-label="Label"><option value="">No label</option>${Object.entries(TAG_LABELS).map(([k, v]) => `<option value="${k}"${s.tag === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+          ${draft.days.length > 1 ? `<select class="move-day" data-move-day data-d="${i}" data-s="${j}" aria-label="Move this stop to another day">
+            <option value="">Move to day…</option>
+            ${draft.days.map((d, k) => (k === i ? '' : `<option value="${k}">Day ${k + 1}${d.date ? ` · ${esc(shortDate(d.date))}` : ''}</option>`)).join('')}
+          </select>` : ''}
         </div>
         <label class="chk"><input type="checkbox" data-a="toggle-dep" data-d="${i}" data-s="${j}"${s.departure ? ' checked' : ''}> Fixed departure (train, flight, bus) — show a “leave by” countdown</label>
         ${s.departure ? `<label class="chk sub">Be there <input type="number" class="num" min="0" max="360" step="5" data-f="${p}.departure.buffer" data-type="number" value="${s.departure.buffer}"> minutes early</label>` : ''}
@@ -257,6 +261,24 @@ export function mountEditor(el, trip, opts) {
 
   /* ---------- events ---------- */
   el.oninput = async (e) => {
+    // Move a stop to another day. It keeps its times and slots in among that day's stops by start time.
+    if (e.type === 'change' && e.target.matches('[data-move-day]')) {
+      if (e.target.value === '') return;
+      const i = Number(e.target.dataset.d), j = Number(e.target.dataset.s), k = Number(e.target.value);
+      const [stop] = draft.days[i].stops.splice(j, 1);
+      const target = draft.days[k].stops;
+      let at = target.findIndex((s) => (s.start || '') > (stop.start || ''));
+      if (at < 0) at = target.length;
+      target.splice(at, 0, stop);
+      errorStops = new Set();
+      changed = true;
+      render();
+      const moved = document.getElementById(`stop-${k}-${at}`);
+      moved?.classList.add('moved');
+      moved?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      toast(`Moved “${stop.title || 'stop'}” to Day ${k + 1}. Check its times fit that day.`, 'ok');
+      return;
+    }
     if (e.type === 'change' && e.target.matches('[data-cover-file]')) {
       const file = e.target.files?.[0];
       if (!file) return;

@@ -2,11 +2,14 @@ rules_version = '2';
 
 // Trips are private to their members.
 //   • Anyone signed in with Google can create a trip; they become its owner.
-//   • Only members (owner + collaborators, by Google email) can read or edit it.
-//   • Only the owner can change the member list or delete the trip.
+//   • Only members (owner + collaborators, by Google email) can read it.
+//   • Members can edit the plan, unless the owner made them view-only (viewerEmails).
+//     View-only members still take part: done/skip, checklist and expenses.
+//   • Only the owner can change who the members are, their roles, or delete the trip.
 //   • A collaborator can remove themselves ("leave trip").
 //   • If the owner turns on link joining, anyone signed in with Google who has the trip's
-//     link can add themselves (and only themselves) as a member.
+//     link can add themselves (and only themselves) as a member — view-only if the owner
+//     chose that for link joiners (linkRole).
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -18,19 +21,34 @@ service cloud.firestore {
     function myEmail() { return request.auth.token.email.lower(); }
     function isMember(data) { return signedIn() && myEmail() in data.memberEmails; }
     function isOwner(data) { return signedIn() && request.auth.uid == data.ownerUid; }
+    // Trips saved before roles existed have no viewerEmails / linkRole: everyone can edit.
+    function viewers(d) { return d.get('viewerEmails', []); }
+    function linkRole(d) { return d.get('linkRole', 'edit'); }
+    function canEdit(data) { return isMember(data) && !(myEmail() in viewers(data)); }
 
     function validTrip(d) {
       return d.keys().hasOnly(['title', 'subtitle', 'timezone', 'days', 'ownerUid', 'ownerEmail',
-                               'memberEmails', 'createdAt', 'updatedAt', 'updatedBy', 'linkJoin'])
+                               'memberEmails', 'viewerEmails', 'createdAt', 'updatedAt', 'updatedBy', 'linkJoin', 'linkRole'])
         && d.title is string && d.title.size() > 0 && d.title.size() <= 120
         && d.subtitle is string && d.subtitle.size() <= 300
         && d.timezone is string && d.timezone.size() <= 64
         && d.days is list && d.days.size() <= 60
         && d.memberEmails is list && d.memberEmails.size() >= 1 && d.memberEmails.size() <= 20
         && d.ownerEmail in d.memberEmails
+        && viewers(d) is list && viewers(d).size() <= 20
+        && viewers(d).toSet().difference(d.memberEmails.toSet()).size() == 0 // viewers are members
+        && !(d.ownerEmail in viewers(d))                                      // the owner always edits
         && linkJoin(d) is bool
+        && linkRole(d) in ['edit', 'view']
         && d.updatedBy == myEmail()
         && d.updatedAt == request.time;
+    }
+    // Who's in the trip and with what access is unchanged.
+    function sameAccess() {
+      return request.resource.data.memberEmails == resource.data.memberEmails
+        && viewers(request.resource.data).toSet() == viewers(resource.data).toSet()
+        && linkJoin(request.resource.data) == linkJoin(resource.data)
+        && linkRole(request.resource.data) == linkRole(resource.data);
     }
 
     match /trips/{tripId} {
@@ -43,16 +61,15 @@ service cloud.firestore {
         && request.resource.data.memberEmails == [myEmail()]
         && request.resource.data.createdAt == request.time;
 
-      // Members edit the plan; only the owner may change who the members are or toggle link joining.
+      // The owner can change anything; members who can edit change the plan only; anyone in the
+      // trip can leave; and people with the link can join while link joining is on.
       allow update: if validTrip(request.resource.data)
         && request.resource.data.ownerUid == resource.data.ownerUid
         && request.resource.data.ownerEmail == resource.data.ownerEmail
         && request.resource.data.createdAt == resource.data.createdAt
-        && ((isMember(resource.data)
-              && (linkJoin(request.resource.data) == linkJoin(resource.data) || isOwner(resource.data))
-              && (request.resource.data.memberEmails == resource.data.memberEmails
-                  || isOwner(resource.data)
-                  || leaving()))
+        && (isOwner(resource.data)
+            || (canEdit(resource.data) && sameAccess())
+            || leaving()
             || joiningByLink());
 
       allow delete: if isOwner(resource.data);
@@ -72,41 +89,97 @@ service cloud.firestore {
       }
 
       // Optional cover photo, kept apart from the plan so it never pushes the trip document toward
-      // Firestore's 1 MB limit. Any member can set or remove it. The app shrinks photos to ≤ 500 KB
-      // (≈ 683,000 characters as a base64 data URL).
+      // Firestore's 1 MB limit. It's part of the plan, so members who can edit set or remove it.
+      // The app shrinks photos to ≤ 500 KB (≈ 683,000 characters as a base64 data URL).
       match /media/{docId} {
         function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
         allow read: if isMember(trip());
         allow create, update: if docId == 'cover'
-          && isMember(trip())
+          && canEdit(trip())
           && request.resource.data.keys().hasOnly(['data', 'updatedBy', 'updatedAt'])
           && request.resource.data.data is string
           && request.resource.data.data.size() <= 700000
           && request.resource.data.data.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+')
           && request.resource.data.updatedBy == myEmail()
           && request.resource.data.updatedAt == request.time;
+        allow delete: if canEdit(trip());
+      }
+
+      // Shared packing list and to-dos. Any member can add, tick, edit or remove items.
+      match /checklist/{itemId} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        function validItem(d) {
+          return d.keys().hasOnly(['text', 'list', 'done', 'doneBy', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt'])
+            && d.text is string && d.text.size() > 0 && d.text.size() <= 200
+            && d.list in ['packing', 'todo']
+            && d.done is bool
+            && d.doneBy is string && d.doneBy.size() <= 200
+            && d.updatedBy == myEmail()
+            && d.updatedAt == request.time;
+        }
+        allow read: if isMember(trip());
+        allow create: if isMember(trip()) && validItem(request.resource.data)
+          && request.resource.data.createdBy == myEmail()
+          && request.resource.data.createdAt == request.time;
+        allow update: if isMember(trip()) && validItem(request.resource.data)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isMember(trip());
+      }
+
+      // Shared expenses. Who paid and who shares it must be members of the trip. A settlement
+      // ("Asha paid Ravi back") is stored the same way, as kind 'settlement'.
+      match /expenses/{expenseId} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        function validExpense(d, members) {
+          return d.keys().hasOnly(['title', 'amount', 'currency', 'paidBy', 'split', 'date', 'kind', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt'])
+            && d.title is string && d.title.size() > 0 && d.title.size() <= 120
+            && d.amount is number && d.amount > 0 && d.amount <= 100000000
+            && d.currency is string && d.currency.matches('[A-Z]{3}')
+            && d.paidBy is string && d.paidBy in members
+            && d.split is list && d.split.size() >= 1 && d.split.size() <= 20
+            && d.split.toSet().difference(members.toSet()).size() == 0
+            && d.date is string && d.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && d.kind in ['expense', 'settlement']
+            && d.updatedBy == myEmail()
+            && d.updatedAt == request.time;
+        }
+        allow read: if isMember(trip());
+        allow create: if isMember(trip()) && validExpense(request.resource.data, trip().memberEmails)
+          && request.resource.data.createdBy == myEmail()
+          && request.resource.data.createdAt == request.time;
+        allow update: if isMember(trip()) && validExpense(request.resource.data, trip().memberEmails)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt;
         allow delete: if isMember(trip());
       }
     }
 
-    // A collaborator removing only themselves, touching nothing else.
+    // A member (editor or viewer) removing only themselves, touching nothing else.
     function leaving() {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberEmails', 'updatedAt', 'updatedBy'])
+      return isMember(resource.data)
         && !isOwner(resource.data)
-        && request.resource.data.memberEmails.toSet() == resource.data.memberEmails.toSet().difference([myEmail()].toSet());
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberEmails', 'viewerEmails', 'updatedAt', 'updatedBy'])
+        && request.resource.data.memberEmails.toSet() == resource.data.memberEmails.toSet().difference([myEmail()].toSet())
+        && viewers(request.resource.data).toSet() == viewers(resource.data).toSet().difference([myEmail()].toSet());
     }
 
     // Trips saved before link joining existed have no linkJoin field: treat it as off.
     function linkJoin(d) { return d.get('linkJoin', false); }
 
-    // Someone with the link adding only themselves, while the owner has link joining on.
+    // Someone with the link adding only themselves, while the owner has link joining on. If the
+    // owner chose view-only for link joiners, they must add themselves to the viewers too.
     function joiningByLink() {
       return signedIn()
         && linkJoin(resource.data) == true
         && !(myEmail() in resource.data.memberEmails)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberEmails', 'updatedAt', 'updatedBy'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberEmails', 'viewerEmails', 'updatedAt', 'updatedBy'])
         && request.resource.data.memberEmails.size() == resource.data.memberEmails.size() + 1
-        && request.resource.data.memberEmails.toSet() == resource.data.memberEmails.toSet().union([myEmail()].toSet());
+        && request.resource.data.memberEmails.toSet() == resource.data.memberEmails.toSet().union([myEmail()].toSet())
+        && ((linkRole(resource.data) == 'view'
+              && viewers(request.resource.data).toSet() == viewers(resource.data).toSet().union([myEmail()].toSet()))
+            || (linkRole(resource.data) == 'edit'
+              && viewers(request.resource.data).toSet() == viewers(resource.data).toSet()));
     }
   }
 }

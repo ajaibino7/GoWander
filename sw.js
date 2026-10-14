@@ -6,7 +6,7 @@
 // VERSION and SHELL are written by scripts/stamp.mjs — don't edit between the build markers.
 
 // build:version
-const VERSION = 'd378d8b9';
+const VERSION = 'be7fe47e';
 // /build:version
 const CACHE = `gowander-${VERSION}`;
 
@@ -18,19 +18,23 @@ const SHELL = [
   './data/trips.json',
   './icons/favicon-64.png',
   './icons/logo.webp',
-  './css/app.css?v=8e1d28f273',
-  './css/styles.css?v=76e2c327de',
+  './css/app.css?v=99ffba6b58',
+  './css/styles.css?v=8b049819ca',
   './js/autocover.js?v=8afe28294f',
-  './js/cloud.js?v=2929a346fb',
-  './js/editor.js?v=99ac93ace9',
+  './js/calendar.js?v=2878c14752',
+  './js/cloud.js?v=3956b81144',
+  './js/editor.js?v=5b40e8f392',
   './js/firebase-config.js?v=caeca71f59',
-  './js/live.js?v=fafc34d339',
-  './js/main.js?v=0408d1fe5a',
+  './js/live.js?v=099883dea9',
+  './js/main.js?v=cb0cdaff7b',
   './js/nearby.js?v=8656ebc47c',
+  './js/offline.js?v=8a40b2d162',
   './js/placepicker.js?v=3594d48934',
+  './js/routing.js?v=165c00c8ee',
   './js/store.js?v=085676b855',
   './js/testkit.js?v=cd1f1e95d1',
-  './js/util.js?v=80527bd589'
+  './js/util.js?v=80527bd589',
+  './js/weather.js?v=f3ec1a4ad6'
 ];
 // /build:shell
 
@@ -94,5 +98,12 @@ self.addEventListener('fetch', (e) => {
   if (url.hostname === 'unpkg.com' || url.hostname.endsWith('tile.openstreetmap.org')
       || (url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/'))) {
     e.respondWith(cacheFirst(req));
+    return;
+  }
+
+  // Destination photos: served from the copy "Make offline-ready" saved (gw-photos), else the
+  // network. Not cached here, because page-loaded images are opaque and bloat storage.
+  if (url.hostname === 'upload.wikimedia.org' || url.hostname === 'thumb.wikimedia.org') {
+    e.respondWith(caches.match(req.url).then((hit) => hit || fetch(req)));
   }
 });
