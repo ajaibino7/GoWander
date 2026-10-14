@@ -388,9 +388,13 @@ function renderTripTools(trip, { sample = false, preview = false } = {}) {
     if (!b) return;
     if (b.dataset.tool === 'calendar') {
       const n = trip.days.reduce((k, d) => k + d.stops.length, 0);
+      // The shared checklist goes into a "Pack & prepare" event with reminders before the trip.
+      let checklist = null;
+      if (!sample) { try { checklist = await cloud.getList(trip.id, 'checklist'); } catch { /* still add the reminder */ } }
+      const checklistUrl = sample ? '' : `${location.origin}${location.pathname}#/checklist/${enc(trip.id)}`;
       let how;
-      try { how = await downloadIcs(trip); } catch { how = 'failed'; }
-      if (how === 'downloaded') toast(`Calendar file downloaded. Open it to add ${n} event${n === 1 ? '' : 's'} to your calendar.`, 'ok');
+      try { how = await downloadIcs(trip, { checklist, checklistUrl }); } catch { how = 'failed'; }
+      if (how === 'downloaded') toast(`Calendar file downloaded. Open it to add ${n} stop${n === 1 ? '' : 's'}, plus packing reminders 8, 4 and 1 hour before you leave.`, 'ok');
       else if (how === 'safari-only') toast('On iPhone, only Safari can add events to Apple Calendar. Open this trip in Safari and tap Add to calendar again.', 'info', { duration: 9000 });
       else if (how === 'reload') toast('Almost ready: reload this page once, then tap Add to calendar again.', 'info', { duration: 9000, action: { label: 'Reload', onClick: () => location.reload() } });
       else if (how === 'failed') toast('Couldn\'t prepare the calendar. Please try again.', 'bad');

@@ -24,10 +24,53 @@ const fold = (line) => {
   return out.map((l, i) => (i ? ` ${l}` : l)).join('\r\n');
 };
 
-export function tripToIcs(trip) {
+// The trip's first moment: the earliest stop on the earliest day.
+function tripStart(trip, clock) {
+  const starts = trip.days.flatMap((d) => (d.stops || []).filter((s) => s.start).map((s) => clock.at(d.date, s.start)));
+  return starts.length ? new Date(Math.min(...starts)) : null;
+}
+
+/**
+ * "🎒 Pack & prepare" — an hour-long event ending when the trip starts, listing what's still
+ * unpacked and the open to-dos, with reminders 8 h, 4 h and 1 h before the trip. Triggers count
+ * from the event's start (an hour before the trip), the form Apple Calendar and Outlook support best.
+ */
+function prepEvent(trip, clock, now, { checklist = null, checklistUrl = '' } = {}) {
+  const start = tripStart(trip, clock);
+  if (!start) return [];
+  const open = (list) => (checklist || []).filter((x) => x.list === list && !x.done).map((x) => `• ${x.text}`);
+  const packing = open('packing'), todo = open('todo');
+  const parts = [];
+  if (packing.length) parts.push(`Still to pack (${packing.length}):\n${packing.join('\n')}`);
+  if (todo.length) parts.push(`To-do (${todo.length}):\n${todo.join('\n')}`);
+  if (!parts.length) parts.push(checklist?.length ? 'Everything on the checklist is done. Have a great trip!' : 'Pack, charge your phone and check your tickets.');
+  if (checklistUrl) parts.push(`Shared checklist: ${checklistUrl}`);
+  const alarm = (trigger, when) => [
+    'BEGIN:VALARM', 'ACTION:DISPLAY',
+    `DESCRIPTION:${text(`${trip.title} starts in ${when}${packing.length || todo.length ? ` · ${packing.length + todo.length} item${packing.length + todo.length === 1 ? '' : 's'} left on the checklist` : ''}`)}`,
+    `TRIGGER:${trigger}`, 'END:VALARM',
+  ];
+  return [
+    'BEGIN:VEVENT',
+    `UID:prep-${trip.id || 'trip'}@gowander`,
+    `DTSTAMP:${now}`,
+    `DTSTART:${utc(new Date(start.getTime() - 3600000))}`,
+    `DTEND:${utc(start)}`,
+    `SUMMARY:${text(`🎒 Pack & prepare for ${trip.title}`)}`,
+    `DESCRIPTION:${text(parts.join('\n\n'))}`,
+    ...alarm('-PT7H', '8 hours'),
+    ...alarm('-PT3H', '4 hours'),
+    ...alarm('PT0S', '1 hour'),
+    'END:VEVENT',
+  ];
+}
+
+// opts: { checklist: shared checklist items, checklistUrl: link back to it } — both optional.
+export function tripToIcs(trip, opts = {}) {
   const clock = makeClock(trip.timezone);
   const now = utc(new Date());
   const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GoWander//Trip planner//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', `X-WR-CALNAME:${text(trip.title)}`];
+  lines.push(...prepEvent(trip, clock, now, opts));
   trip.days.forEach((day, i) => {
     for (const s of day.stops || []) {
       if (!s.start || !s.end || !s.place) continue;
@@ -86,8 +129,8 @@ async function swController(ms = 2500) {
  *   'safari-only' — another browser on iPhone: only Safari can add to Apple Calendar.
  *   'downloaded'  — Android and computers: a .ics file the calendar app opens.
  */
-export async function downloadIcs(trip) {
-  const ics = tripToIcs(trip);
+export async function downloadIcs(trip, opts = {}) {
+  const ics = tripToIcs(trip, opts);
   if (isIOS()) {
     if (!isIOSSafari()) return 'safari-only';
     if (!(await swController())) return 'reload';

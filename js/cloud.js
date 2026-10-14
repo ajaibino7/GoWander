@@ -299,6 +299,14 @@ export async function watchList(id, sub, cb, onError) {
     (e) => onError?.(friendly(e)));
 }
 
+// One-off read of a shared list (e.g. the checklist for the calendar export). Falls back to the
+// offline copy when there's no signal, and gives up after a few seconds rather than hang.
+export async function getList(id, sub) {
+  const { db, F } = await init();
+  const read = F.getDocs(F.collection(db, 'trips', id, sub)).then((snap) => snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  return Promise.race([read, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000))]);
+}
+
 export async function addChecklistItem(user, id, list, text) {
   const { db, F } = await init();
   await commit(F.addDoc(F.collection(db, 'trips', id, 'checklist'), {
