@@ -63,6 +63,8 @@
 
 /* ---------- editor ---------- */
 .editor { display: grid; gap: 14px; padding-bottom: 76px; }
+.ed-notice { background: var(--info-bg); border-radius: 10px; padding: 10px 14px; font-size: 14px; }
+.ed-notice .mini { margin-left: 4px; }
 .ed-errors { background: var(--bad-bg); border-radius: 10px; padding: 10px 14px; font-size: 14px; }
 .ed-errors ul { margin: 6px 0 0; padding-left: 18px; }
 .ed-day { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px; min-width: 0; }
@@ -102,6 +104,16 @@
 }
 
 /* ---------- sign-in, members, account ---------- */
+.samples { display: grid; gap: 12px; }
+.samples > summary {
+  display: flex; align-items: baseline; gap: 10px; cursor: pointer; list-style: none; padding: 6px 2px; user-select: none;
+}
+.samples > summary::-webkit-details-marker { display: none; }
+.samples > summary::before { content: "▸"; color: var(--muted); transition: transform .15s; display: inline-block; }
+.samples[open] > summary::before { transform: rotate(90deg); }
+.samples > summary .list-h { margin: 0; }
+.samples > summary:hover .muted { color: var(--ink); }
+.done-by { color: var(--ok); font-weight: 600; }
 .list-h { font-family: var(--serif); font-weight: normal; font-size: 19px; margin: 8px 0 -4px; }
 .btn.google { background: #fff; color: #1f1f1f; border: 1px solid #dadce0; font-weight: 600; }
 .btn.google .g {
@@ -157,11 +169,46 @@ body.modal-open { overflow: hidden; }
 .pp-chips .mini { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pp-err { color: var(--bad); font-size: 13px; }
 
-/* ---------- toast ---------- */
-.toast {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom)); z-index: 3000;
-  max-width: calc(100vw - 32px); background: #1d2433; color: #fff; padding: 10px 16px; border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .3); font-size: 14px;
+.app-version { text-align: center; }
+
+/* ---------- toaster ---------- */
+.toaster {
+  position: fixed; z-index: 3000; display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+  left: 12px; right: 12px; bottom: calc(80px + env(safe-area-inset-bottom)); align-items: center;
 }
-.toast.ok { background: #1f6b48; }
-.toast.bad { background: #a3352a; }
+@media (min-width: 700px) { .toaster { left: auto; right: 20px; bottom: 20px; align-items: flex-end; } }
+body:has(.ed-bar) .toaster { bottom: calc(80px + env(safe-area-inset-bottom)); }
+.toast {
+  pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; width: min(400px, 100%);
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid var(--sea);
+  border-radius: 12px; padding: 10px 8px 10px 12px; box-shadow: 0 10px 30px rgba(10, 20, 40, .22); font-size: 14px; line-height: 1.4;
+  opacity: 0; transform: translateY(12px) scale(.98); transition: opacity .2s ease, transform .2s ease;
+}
+.toast.in { opacity: 1; transform: none; }
+.toast.out { opacity: 0; transform: translateY(8px) scale(.98); }
+@media (prefers-reduced-motion: reduce) { .toast { transition: opacity .15s; transform: none !important; } }
+.t-icon {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; font-weight: 800; color: var(--surface); background: var(--sea); margin-top: 1px;
+}
+.t-body { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding-top: 2px; }
+.t-msg { flex: 1 1 180px; overflow-wrap: anywhere; }
+.t-detail { flex-basis: 100%; color: var(--muted); font-size: 13px; }
+.t-actions { flex-basis: 100%; display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.t-btn {
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; border-radius: 8px; padding: 6px 12px;
+  background: transparent; color: var(--ink); border: 1px solid var(--line);
+}
+.t-btn:hover { background: var(--surface-2); }
+.t-btn.primary { background: var(--sea); border-color: var(--sea); color: #fff; }
+.t-btn.danger { background: var(--bad); border-color: var(--bad); color: var(--surface); }
+.t-btn.primary:hover, .t-btn.danger:hover { filter: brightness(1.08); }
+.t-x { flex: 0 0 auto; background: none; border: 0; color: var(--faint); cursor: pointer; font-size: 13px; width: 26px; height: 26px; border-radius: 6px; }
+.t-x:hover { background: var(--surface-2); color: var(--ink); }
+.t-input { flex-basis: 100%; font: inherit; font-size: 12px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.toast.ok { border-left-color: var(--ok); } .toast.ok .t-icon { background: var(--ok); }
+.toast.bad { border-left-color: var(--bad); } .toast.bad .t-icon { background: var(--bad); }
+.toast.warn { border-left-color: var(--amber); } .toast.warn .t-icon { background: var(--amber); }
+.toast.ask { border-left-color: var(--coral); } .toast.ask .t-icon { background: var(--coral); }
+.toast.ask.danger { border-left-color: var(--bad); } .toast.ask.danger .t-icon { background: var(--bad); }
+.toast.ask .t-msg { font-weight: 600; }

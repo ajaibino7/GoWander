@@ -125,13 +125,125 @@ export function newId(title = 'trip') {
   return `${slug}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-let toastTimer;
-export function toast(msg, kind = '') {
-  const el = document.getElementById('toast');
-  if (!el) return;
-  el.textContent = msg;
+/* ============================================================
+   Toaster — notifications and questions, instead of browser pop-ups
+   ============================================================ */
+const ICONS = { ok: '✓', bad: '!', warn: '!', info: 'i', ask: '?' };
+const MAX_TOASTS = 4;
+let toaster = null;
+let pendingAsk = null;
+
+function toasterEl() {
+  if (!toaster) {
+    toaster = document.createElement('div');
+    toaster.className = 'toaster';
+    toaster.setAttribute('aria-live', 'polite');
+    document.body.appendChild(toaster);
+  }
+  return toaster;
+}
+
+function makeToast(kind, { role = 'status', closable = true } = {}) {
+  const el = document.createElement('div');
   el.className = `toast ${kind}`;
-  el.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
+  el.setAttribute('role', role);
+  el.innerHTML = `<span class="t-icon" aria-hidden="true">${ICONS[kind] || ICONS.info}</span><div class="t-body"></div>${closable ? '<button type="button" class="t-x" aria-label="Dismiss">✕</button>' : ''}`;
+  const box = toasterEl();
+  box.appendChild(el);
+  // Keep the stack short: drop the oldest plain notifications first.
+  const plain = [...box.querySelectorAll('.toast:not(.ask):not(.out)')];
+  while (box.querySelectorAll('.toast:not(.out)').length > MAX_TOASTS && plain.length) dismiss(plain.shift());
+  requestAnimationFrame(() => el.classList.add('in'));
+  return el;
+}
+
+function dismiss(el) {
+  if (!el || el.classList.contains('out')) return;
+  el.classList.remove('in');
+  el.classList.add('out');
+  setTimeout(() => el.remove(), 220);
+}
+
+/**
+ * Shows a notification. kind: 'ok' | 'bad' | 'warn' | 'info'.
+ * options.duration: ms before it hides (0 = stays until dismissed).
+ * options.action: { label, onClick } adds a button, e.g. "Reload".
+ * Returns a function that dismisses it.
+ */
+export function toast(msg, kind = 'info', { duration, action } = {}) {
+  const el = makeToast(kind, { role: kind === 'bad' ? 'alert' : 'status' });
+  const body = el.querySelector('.t-body');
+  const text = document.createElement('span');
+  text.className = 't-msg';
+  text.textContent = msg;
+  body.appendChild(text);
+  if (action) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 't-btn primary';
+    b.textContent = action.label;
+    b.onclick = () => { dismiss(el); action.onClick(); };
+    body.appendChild(b);
+  }
+  el.querySelector('.t-x').onclick = () => dismiss(el);
+  const ms = duration ?? (kind === 'bad' ? 6000 : action ? 8000 : 3500);
+  let timer = ms ? setTimeout(() => dismiss(el), ms) : null;
+  // Don't vanish while someone is reading or reaching for it.
+  el.addEventListener('pointerenter', () => clearTimeout(timer));
+  el.addEventListener('pointerleave', () => { if (ms) timer = setTimeout(() => dismiss(el), 2000); });
+  return () => dismiss(el);
+}
+
+/**
+ * Asks a question in a toast. Resolves true for the confirm button, false for cancel,
+ * Escape, ✕, or when another question replaces it.
+ *   await ask('Remove this stop?', { ok: 'Remove', danger: true })
+ */
+export function ask(message, { ok = 'OK', cancel = 'Cancel', danger = false, detail = '' } = {}) {
+  pendingAsk?.(false);
+  return new Promise((resolve) => {
+    const el = makeToast('ask', { role: 'alertdialog' });
+    el.classList.add('ask');
+    if (danger) el.classList.add('danger');
+    el.setAttribute('aria-label', message);
+    const body = el.querySelector('.t-body');
+    body.innerHTML = `
+      <span class="t-msg"></span>
+      ${detail ? '<span class="t-detail"></span>' : ''}
+      <span class="t-actions">
+        <button type="button" class="t-btn" data-r="0"></button>
+        <button type="button" class="t-btn ${danger ? 'danger' : 'primary'}" data-r="1"></button>
+      </span>`;
+    body.querySelector('.t-msg').textContent = message;
+    if (detail) body.querySelector('.t-detail').textContent = detail;
+    body.querySelector('[data-r="0"]').textContent = cancel;
+    body.querySelector('[data-r="1"]').textContent = ok;
+
+    const finish = (answer) => {
+      if (pendingAsk !== finish) return;
+      pendingAsk = null;
+      document.removeEventListener('keydown', onKey, true);
+      dismiss(el);
+      resolve(answer);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); finish(false); } };
+    pendingAsk = finish;
+    document.addEventListener('keydown', onKey, true);
+    el.querySelector('.t-x').onclick = () => finish(false);
+    body.onclick = (e) => { const b = e.target.closest('[data-r]'); if (b) finish(b.dataset.r === '1'); };
+    setTimeout(() => body.querySelector('[data-r="1"]').focus(), 50);
+  });
+}
+
+// Shows a link the user can copy by hand (fallback when the clipboard isn't available).
+export function toastLink(label, url) {
+  const el = makeToast('info');
+  const body = el.querySelector('.t-body');
+  body.innerHTML = '<span class="t-msg"></span><input class="t-input" readonly>';
+  body.querySelector('.t-msg').textContent = label;
+  const input = body.querySelector('.t-input');
+  input.value = url;
+  input.onfocus = () => input.select();
+  el.querySelector('.t-x').onclick = () => dismiss(el);
+  setTimeout(() => input.focus(), 50);
 }

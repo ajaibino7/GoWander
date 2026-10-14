@@ -15,8 +15,19 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const str = (v, max = 500) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const clamp = (v, lo, hi, dflt) => (Number.isFinite(Number(v)) && v !== '' && v !== null ? Math.min(hi, Math.max(lo, Number(v))) : dflt);
 
+// Every stop keeps a stable id so shared progress (done/skip) survives edits and reordering.
+// Stops saved before ids existed get a deterministic one from their date, time and title.
+const STOP_ID = /^[\w-]{1,40}$/;
+function derivedStopId(date, start, title) {
+  let h = 2166136261;
+  for (const ch of `${date}|${start}|${title}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+  return `s${(h >>> 0).toString(36)}`;
+}
+export const newStopId = () => `s${Math.random().toString(36).slice(2, 10)}`;
+
 export function normalizeTrip(raw) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.days)) throw new Error('That doesn\'t look like a trip.');
+  const usedIds = new Set();
   const trip = {
     id: str(raw.id, 80).replace(/[^\w-]/g, '') || newId(raw.title),
     title: str(raw.title, 120) || 'Untitled trip',
@@ -33,7 +44,11 @@ export function normalizeTrip(raw) {
       const p = s.place || {};
       const lat = Number(p.lat), lng = Number(p.lng);
       if (!(lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180)) continue;
+      let id = typeof s.id === 'string' && STOP_ID.test(s.id) ? s.id : derivedStopId(d.date, s.start, s.title);
+      for (let n = 2; usedIds.has(id); n++) id = `${id.replace(/-\d+$/, '')}-${n}`;
+      usedIds.add(id);
       const stop = {
+        id,
         start: s.start,
         end: s.end < s.start ? s.start : s.end,
         kind: KINDS.includes(s.kind) ? s.kind : 'stop',

@@ -3,17 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Trip Companion</title>
+  <title>GoWander</title>
   <meta name="description" content="Plan trips day by day and follow them live with location-aware status.">
   <meta name="theme-color" content="#13294b">
+  <meta name="app-version" content="78bf67e4">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="GoWander">
+  <meta name="application-name" content="GoWander">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="css/styles.css">
-  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/styles.css?v=49a6566933">
+  <link rel="stylesheet" href="css/app.css?v=be71a04ad3">
 </head>
 <body>
   <div id="sim-banner" class="sim-banner" hidden></div>
@@ -25,7 +28,7 @@
     </svg>
     <div class="hero-inner">
       <nav class="hero-nav" id="hero-nav" aria-label="Page"></nav>
-      <div class="eyebrow" id="hero-eyebrow">Trip companion</div>
+      <div class="eyebrow" id="hero-eyebrow">GoWander</div>
       <h1 id="hero-title">Trips</h1>
       <div class="hero-desc" id="hero-desc" hidden></div>
       <div class="hero-sub" id="hero-sub"></div>
@@ -68,9 +71,25 @@
 
   <footer class="site-foot" id="site-foot"></footer>
   <div id="modal" class="modal" hidden></div>
-  <div id="toast" class="toast" role="status" hidden></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="js/main.js"></script>
+  <!-- build:importmap -->
+  <script type="importmap">
+  {
+    "imports": {
+      "./js/cloud.js": "./js/cloud.js?v=76ecadffc7",
+      "./js/editor.js": "./js/editor.js?v=ffc1d1961b",
+      "./js/firebase-config.js": "./js/firebase-config.js?v=caeca71f59",
+      "./js/live.js": "./js/live.js?v=5815dfb5f9",
+      "./js/main.js": "./js/main.js?v=9d46a79cf3",
+      "./js/placepicker.js": "./js/placepicker.js?v=3594d48934",
+      "./js/store.js": "./js/store.js?v=085676b855",
+      "./js/testkit.js": "./js/testkit.js?v=cd1f1e95d1",
+      "./js/util.js": "./js/util.js?v=80527bd589"
+    }
+  }
+  </script>
+  <!-- /build:importmap -->
+  <script type="module" src="js/main.js?v=9d46a79cf3"></script>
 </body>
 </html>

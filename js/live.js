@@ -48,7 +48,16 @@ export const state = {
   selectedDay: null,
   selectedStop: null,
   done: new Set(),
+  doneBy: new Map(), // stop id → email of the member who marked it (shared trips)
 };
+
+// Shared trips pass onDone so marks sync to all members; otherwise they stay on this device.
+let doneHook = null;
+export function setDone(byStop) {
+  state.doneBy = byStop;
+  state.done = new Set(byStop.keys());
+  if (TRIP) render();
+}
 
 const samePlace = (a, b) => a.lat === b.lat && a.lng === b.lng;
 
@@ -56,7 +65,7 @@ function prepare(trip) {
   const c = makeClock(trip.timezone);
   const days = trip.days.filter((d) => d.stops.length).map((d, i) => {
     const day = { ...d, n: i + 1, theme: THEMES[i % THEMES.length], weekday: weekdayOf(d.date), label: shortDate(d.date) };
-    day.stops = d.stops.map((s, j) => ({ ...s, id: `d${i + 1}-${j}`, idx: j, day, startAt: c.at(d.date, s.start), endAt: c.at(d.date, s.end) }));
+    day.stops = d.stops.map((s, j) => ({ ...s, id: s.id || `d${i + 1}-${j}`, idx: j, day, startAt: c.at(d.date, s.start), endAt: c.at(d.date, s.end) }));
     day.startAt = day.stops[0].startAt;
     day.endAt = day.stops[day.stops.length - 1].endAt;
     // A stop marked as a fixed departure (train, flight, bus) drives the "leave by" countdown.
@@ -385,7 +394,7 @@ function renderDay(t, ph) {
           <div class="c">
             <div class="w">${esc(s.title)}${s.tag ? `<span class="tag ${s.tag}">${TAG_LABELS[s.tag]}</span>` : ''}${s.departure ? '<span class="tag deadline">Departure</span>' : ''}${ss === 'now' ? '<span class="tag nowtag">Now</span>' : ''}${here ? '<span class="tag heretag">You\'re here</span>' : ''}</div>
             ${s.note ? `<div class="n">${esc(s.note)}</div>` : ''}
-            <div class="m"><span>📍 ${esc(s.place.name)}${s.place.approx ? ' (approx.)' : ''}</span>${dist ? `<span>${dist} away</span>` : ''}</div>
+            <div class="m"><span>📍 ${esc(s.place.name)}${s.place.approx ? ' (approx.)' : ''}</span>${dist ? `<span>${dist} away</span>` : ''}${state.doneBy.has(s.id) ? `<span class="done-by">✓ ${esc(state.doneBy.get(s.id).split('@')[0])}</span>` : ''}</div>
             ${state.selectedStop === s.id ? `
               <div class="stop-actions">
                 <a class="mini" href="${directionsUrl(s.place)}" target="_blank" rel="noopener">Directions</a>
@@ -521,8 +530,9 @@ function wire() {
     const doneBtn = e.target.closest('[data-done]');
     if (doneBtn) {
       const id = doneBtn.dataset.done;
-      state.done.has(id) ? state.done.delete(id) : state.done.add(id);
-      saveDone();
+      const on = !state.done.has(id);
+      if (on) state.done.add(id); else state.done.delete(id);
+      if (doneHook) doneHook(id, on); else saveDone();
       render();
       return;
     }
@@ -562,9 +572,10 @@ function wire() {
    ============================================================ */
 let timer = null, testkit = null;
 
-export function mountTrip(trip) {
+export function mountTrip(trip, { onDone = null } = {}) {
   // Same trip again = a live update from another member: keep the user's place in the UI.
   const update = TRIP?.id === trip.id;
+  doneHook = onDone;
   TRIP = trip;
   ({ clock, days: DAYS } = prepare(trip));
   if (sim.nowStr && !sim.base) setSimTime(clock.parseInput(sim.nowStr));
@@ -577,7 +588,8 @@ export function mountTrip(trip) {
   }
   state.selectedDay = null;
   state.selectedStop = null;
-  state.done = loadDone();
+  state.done = onDone ? new Set() : loadDone();
+  state.doneBy = new Map();
   refitMap();
   $('site-foot').textContent = `Times are in trip time (${clock.label}). Your location stays on your device and is never uploaded.`;
 

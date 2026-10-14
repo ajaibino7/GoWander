@@ -1,6 +1,6 @@
 {
-  "name": "Trip Companion",
-  "short_name": "Trips",
+  "name": "GoWander",
+  "short_name": "GoWander",
   "description": "Plan trips day by day and follow them live with location-aware status.",
   "start_url": "./",
   "scope": "./",

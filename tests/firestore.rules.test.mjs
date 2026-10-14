@@ -111,6 +111,37 @@ test('the owner cannot remove themselves', async () => {
   await assertFails(updateDoc(trip(OWNER), { memberEmails: [FRIEND.email], ...stamp(OWNER) }));
 });
 
+/* ---------- shared progress (done / skipped stops) ---------- */
+const progress = (u) => doc(db(u), 'trips', 't1', 'state', 'progress');
+const tick = (u, done = { s1: u.email }) => setDoc(progress(u), { done, ...stamp(u) }, { merge: true });
+
+test('members can tick stops and everyone in the trip sees it', async () => {
+  await addFriend();
+  await assertSucceeds(tick(FRIEND));
+  await assertSucceeds(getDoc(progress(OWNER)));
+  await assertSucceeds(tick(OWNER, { s2: OWNER.email }));
+});
+test('strangers cannot read or change progress', async () => {
+  await tick(OWNER);
+  await assertFails(getDoc(progress(STRANGER)));
+  await assertFails(tick(STRANGER));
+});
+test('progress must be stamped with your own email and has no extra fields', async () => {
+  await addFriend();
+  await assertFails(setDoc(progress(FRIEND), { done: {}, updatedAt: serverTimestamp(), updatedBy: OWNER.email }));
+  await assertFails(setDoc(progress(FRIEND), { done: {}, junk: 1, ...stamp(FRIEND) }));
+});
+test('only the progress document is writable', async () => {
+  await assertFails(setDoc(doc(db(OWNER), 'trips', 't1', 'state', 'other'), { done: {}, ...stamp(OWNER) }));
+});
+test('a removed member loses access to progress', async () => {
+  await addFriend();
+  await tick(FRIEND);
+  await updateDoc(trip(OWNER), { memberEmails: [OWNER.email], ...stamp(OWNER) });
+  await assertFails(getDoc(progress(FRIEND)));
+  await assertFails(tick(FRIEND));
+});
+
 /* ---------- deleting ---------- */
 test('only the owner can delete a trip', async () => {
   await addFriend();

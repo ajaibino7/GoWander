@@ -51,6 +51,20 @@ service cloud.firestore {
             || leaving());
 
       allow delete: if isOwner(resource.data);
+
+      // Shared progress (done / skipped stops). Any member can tick or untick a stop.
+      match /state/{docId} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        allow read: if isMember(trip());
+        allow create, update: if docId == 'progress'
+          && isMember(trip())
+          && request.resource.data.keys().hasOnly(['done', 'updatedBy', 'updatedAt'])
+          && request.resource.data.done is map
+          && request.resource.data.done.size() <= 1000
+          && request.resource.data.updatedBy == myEmail()
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if isOwner(trip());
+      }
     }
 
     // A collaborator removing only themselves, touching nothing else.

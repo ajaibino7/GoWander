@@ -1,4 +1,4 @@
-# Trip Companion
+# GoWander
 
 Plan trips together and follow them live: what's on now, what's next, and whether you're on
 track based on your location.
@@ -87,12 +87,32 @@ and 20,000 writes per day, and 1 GB of storage.
    git remote add origin https://github.com/<your-username>/mumbai-lonavala-trip.git
    git push -u origin main
    ```
-2. On GitHub, go to **Settings → Pages**. Under **Build and deployment**, set the source to
-   **Deploy from a branch**, choose `main` and `/ (root)`, and save.
-3. After a minute the site is live at `https://<your-username>.github.io/mumbai-lonavala-trip/`.
+2. On GitHub, go to **Settings → Pages**. Under **Build and deployment**, set **Source** to
+   **GitHub Actions**.
+3. Every push to `main` now runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml),
+   which stamps versions and publishes the site. Watch it under the repo's **Actions** tab.
+   After a minute the site is live at `https://<your-username>.github.io/mumbai-lonavala-trip/`.
 
-After changing the app's code, bump `CACHE` in `sw.js` (for example `mlt-v4`) so installed
-copies pick up the update.
+## Versioning and caching
+
+Browsers, GitHub Pages (10-minute cache) and the offline service worker all cache files.
+[`scripts/stamp.mjs`](scripts/stamp.mjs) makes sure nobody runs stale code after a deploy:
+
+- **Versioned files:** every JS and CSS file gets a content-hash version, for example
+  `js/live.js?v=5815dfb5f9`. An **import map** in `index.html` applies the versions to module
+  imports too. Only files that changed get a new URL, so unchanged ones stay cached.
+- **App version:** the app version (shown on the Account page) names the offline cache, and old
+  caches are deleted when a new version activates.
+- **Update notice:** `version.json` holds the current version. The open app checks it when you
+  return to it, and every 30 minutes, then shows **"A new version of GoWander is available ·
+  Reload"**.
+
+The deploy workflow runs the stamp automatically. If you deploy another way (for example
+**Deploy from a branch**), run it yourself before committing:
+
+```bash
+npm run stamp
+```
 
 ## Project layout
 
@@ -111,6 +131,10 @@ copies pick up the update.
 | `data/trips.json` | Sample trips shown to everyone |
 | `firestore.rules` | Who can read and write trips |
 | `tests/` | Security rules tests |
+| `sw.js` | Offline support and cache control (versions written by the stamp script) |
+| `version.json` | Current app version, used for the "new version available" notice |
+| `scripts/stamp.mjs` | Cache-busting: stamps content-hash versions on JS/CSS |
+| `.github/workflows/deploy.yml` | Stamps and deploys to GitHub Pages on every push |
 
 ## Local development and testing
 

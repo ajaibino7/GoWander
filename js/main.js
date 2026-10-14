@@ -1,8 +1,8 @@
 // App shell: hash router, sign-in, trip list, members, account, and importing shared trips.
-import { esc, fmtRange, toast, makeClock, deviceTz, THEMES, addDays } from './util.js';
+import { esc, fmtRange, toast, ask, toastLink, makeClock, deviceTz, THEMES, addDays } from './util.js';
 import * as store from './store.js';
 import * as cloud from './cloud.js';
-import { mountTrip, unmountTrip, sim } from './live.js';
+import { mountTrip, unmountTrip, setDone, sim } from './live.js';
 import { mountEditor } from './editor.js';
 
 const $ = (id) => document.getElementById(id);
@@ -17,7 +17,8 @@ let samples = [];
 let myTrips = [];
 let myTripsReady = null, resolveMyTrips = () => {};
 let unsubMine = null;
-let unsubTrip = null;
+let cleanups = []; // live listeners for the current screen, closed on navigation
+const keep = (unsub) => { if (unsub) cleanups.push(unsub); };
 
 function showView(name) {
   for (const v of VIEWS) $(`view-${v}`).hidden = v !== name;
@@ -25,14 +26,14 @@ function showView(name) {
 }
 
 const fancyTitle = (t) => esc(t).replace(/ (\+|&amp;) /g, ' <em>$1</em> ');
-function setHero({ eyebrow = 'Trip companion', title = 'Trips', sub = '', desc = '', nav = '' }) {
+function setHero({ eyebrow = 'GoWander', title = 'Trips', sub = '', desc = '', nav = '' }) {
   $('hero-eyebrow').textContent = eyebrow;
   $('hero-title').innerHTML = fancyTitle(title);
   $('hero-sub').textContent = sub;
   $('hero-desc').textContent = desc;
   $('hero-desc').hidden = !desc;
   $('hero-nav').innerHTML = nav;
-  document.title = title === 'Trips' ? 'Trip Companion' : `${title} · Trip Companion`;
+  document.title = title === 'Trips' ? 'GoWander' : `${title} · GoWander`;
 }
 const backLink = (href = '#/', label = 'All trips') => `<a class="hn-btn" href="${href}">‹ ${label}</a>`;
 const accountChip = () => (user
@@ -79,7 +80,7 @@ async function shareOrCopy(url, text, copiedMsg) {
   if (navigator.share) {
     try { await navigator.share({ text, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
-  try { await navigator.clipboard.writeText(url); toast(copiedMsg, 'ok'); } catch { prompt('Copy this link:', url); }
+  try { await navigator.clipboard.writeText(url); toast(copiedMsg, 'ok'); } catch { toastLink('Copy this link:', url); }
 }
 
 /* ============================================================
@@ -118,6 +119,23 @@ function signInCard(message = '') {
     </section>`;
 }
 
+// The sample trip sits behind a label until clicked. The open/closed state survives the list
+// re-rendering when trips change.
+let samplesOpen = false;
+function samplesSection(cards) {
+  if (!samples.length) return '';
+  return `
+    <details class="samples"${samplesOpen ? ' open' : ''}>
+      <summary><span class="list-h">Sample trip</span><span class="muted small">${samplesOpen ? 'Hide' : 'Show'}</span></summary>
+      <div class="trip-list">${cards}</div>
+    </details>`;
+}
+document.addEventListener('toggle', (e) => {
+  if (!e.target.matches?.('details.samples')) return;
+  samplesOpen = e.target.open;
+  e.target.querySelector('summary .muted').textContent = samplesOpen ? 'Hide' : 'Show';
+}, true);
+
 function showHome({ message = '' } = {}) {
   setHero({
     title: 'Trips',
@@ -133,7 +151,7 @@ function showHome({ message = '' } = {}) {
 
   if (!user) {
     $('view-home').innerHTML = `${signInCard(message)}
-      ${samples.length ? `<h2 class="list-h">Sample trip</h2><div class="trip-list">${sampleCards}</div>` : ''}`;
+      ${samplesSection(sampleCards)}`;
     showView('home');
     return;
   }
@@ -161,7 +179,7 @@ function showHome({ message = '' } = {}) {
           <p>Create one, copy the sample, or import a trips file. Trips others share with you appear here too.</p>
         </div>`}
     </div>
-    ${samples.length ? `<h2 class="list-h">Sample trip</h2><div class="trip-list">${sampleCards}</div>` : ''}
+    ${samplesSection(sampleCards)}
     <input type="file" id="import-file" accept=".json,application/json" hidden>`;
   showView('home');
 }
@@ -179,9 +197,9 @@ function tripNav(trip, { sample = false, preview = false, meta = null } = {}) {
 }
 
 function showTripObject(trip, opts) {
-  setHero({ eyebrow: opts.sample ? 'Sample trip' : 'Live trip companion', title: trip.title, desc: trip.subtitle, nav: tripNav(trip, opts) });
+  setHero({ eyebrow: opts.sample ? 'Sample trip' : 'GoWander · live', title: trip.title, desc: trip.subtitle, nav: tripNav(trip, opts) });
   showView('trip');
-  mountTrip(trip);
+  mountTrip(trip, { onDone: opts.onDone });
 }
 
 function showDenied(id) {
@@ -204,20 +222,24 @@ async function showTrip(id) {
   if (sample) { showTripObject(sample, { sample: true }); return; }
   if (!user) { showHome({ message: 'Sign in to open this trip. You need to be one of its members.' }); return; }
 
-  let first = true;
-  unsubTrip = await cloud.watchTrip(id, (entry) => {
-    if (current !== 'trip' && !first) return;
+  // Done/skip marks are shared: ticking a stop shows up for every member.
+  const onDone = (stopId, on) => cloud.setStopDone(user, id, stopId, on).catch((e) => toast(e.message, 'bad'));
+  let progressStarted = false;
+  keep(await cloud.watchTrip(id, (entry) => {
     if (!entry) {
       toast('This trip was deleted, or you were removed from it.', 'bad');
       location.replace('#/');
       return;
     }
-    first = false;
-    showTripObject(entry.trip, { meta: entry.meta });
+    showTripObject(entry.trip, { meta: entry.meta, onDone });
+    if (!progressStarted) {
+      progressStarted = true;
+      cloud.watchProgress(id, setDone).then(keep);
+    }
   }, (err) => {
     if (err === 'denied') showDenied(id);
     else toast(err, 'bad');
-  });
+  }));
 }
 
 /* ============================================================
@@ -260,13 +282,19 @@ async function showEdit(id) {
         await cloud.updateTrip(user, id, draft, baseMs);
       } catch (e) {
         if (!(e instanceof cloud.ConflictError)) throw e;
-        if (!confirm(`${e.by || 'Another member'} changed this trip while you were editing.\n\nOK = overwrite with your version\nCancel = keep editing (reload to see their changes)`)) return false;
+        if (!(await ask(`${e.by || 'Another member'} changed this trip while you were editing.`, {
+          detail: 'Overwrite their changes with yours, or keep editing and load their version first.',
+          ok: 'Overwrite',
+          cancel: 'Keep editing',
+          danger: true,
+        }))) return false;
         await cloud.updateTrip(user, id, draft, baseMs, { force: true });
       }
       toast('Saved', 'ok');
       location.hash = `#/trip/${enc(id)}`;
     },
     onCancel: () => { location.hash = isNew ? '#/' : `#/trip/${enc(id)}`; },
+    onReload: () => route(),
     onDelete: async () => { await cloud.deleteTrip(id); toast('Trip deleted', 'ok'); location.hash = '#/'; },
     onDuplicate: async (copy) => {
       copy.title = `${copy.title} (copy)`;
@@ -275,6 +303,17 @@ async function showEdit(id) {
       location.hash = `#/edit/${enc(newId)}`;
     },
   });
+
+  // Tell the editor when another member saves this trip, so nobody edits a stale copy unknowingly.
+  if (!isNew) {
+    keep(await cloud.watchTrip(id, (e) => {
+      if (!e) { editor?.notice('This trip was just deleted by its owner.'); return; }
+      if (e.meta.updatedAtMs && e.meta.updatedAtMs !== baseMs && !e.meta.pending) {
+        const who = e.meta.updatedBy === user.email ? 'You (on another device)' : esc(e.meta.updatedBy);
+        editor?.notice(`<strong>${who}</strong> just saved changes to this trip.`, true);
+      }
+    }));
+  }
 }
 
 /* ============================================================
@@ -283,10 +322,10 @@ async function showEdit(id) {
 async function showMembers(id) {
   if (!user) { showHome({ message: 'Sign in to manage trip members.' }); return; }
   // Re-renders live as members are added or removed (the watcher is closed on navigation).
-  unsubTrip = await cloud.watchTrip(id, (entry) => {
+  keep(await cloud.watchTrip(id, (entry) => {
     if (!entry) { toast('This trip was deleted, or you were removed from it.', 'bad'); location.replace('#/'); return; }
     renderMembers(entry);
-  }, (err) => { if (err === 'denied') showDenied(id); else toast(err, 'bad'); });
+  }, (err) => { if (err === 'denied') showDenied(id); else toast(err, 'bad'); }));
 }
 
 function renderMembers({ trip, meta }) {
@@ -354,14 +393,14 @@ function renderMembers({ trip, meta }) {
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.remove) {
-      if (!confirm(`Remove ${b.dataset.remove} from this trip?`)) return;
+      if (!(await ask(`Remove ${b.dataset.remove} from this trip?`, { detail: 'They lose access straight away.', ok: 'Remove', danger: true }))) return;
       try { await cloud.setMembers(user, trip.id, meta.memberEmails.filter((m) => m !== b.dataset.remove)); toast('Removed', 'ok'); } catch (err) { toast(err.message, 'bad'); }
     } else if (b.dataset.invite) {
       shareOrCopy(b.dataset.invite, `Join my trip “${trip.title}”`, 'Invite link copied');
     } else if ('sendCopy' in b.dataset) {
       shareCopy(trip);
     } else if ('leave' in b.dataset) {
-      if (!confirm('Leave this trip? You\'ll lose access until the owner adds you again.')) return;
+      if (!(await ask('Leave this trip?', { detail: 'You\'ll lose access until the owner adds you again.', ok: 'Leave trip', danger: true }))) return;
       try { await cloud.leaveTrip(user, trip.id); toast('You left the trip', 'ok'); location.replace('#/'); } catch (err) { toast(err.message, 'bad'); }
     }
   };
@@ -391,6 +430,7 @@ function showAccount() {
         <button class="btn ghost" type="button" data-a="import">Import file</button>
       </div>
     </section>
+    <p class="fine app-version">GoWander version ${esc(APP_VERSION)}</p>
     <input type="file" id="import-file-s" accept=".json,application/json" hidden>`;
   showView('settings');
 }
@@ -474,7 +514,7 @@ document.addEventListener('click', async (e) => {
       } catch (err) { toast(err.message, 'bad'); }
       break;
     case 'signout':
-      if (!confirm('Sign out? Trips stay safe in your account; the offline copy on this device is removed.')) return;
+      if (!(await ask('Sign out of GoWander?', { detail: 'Your trips stay safe in your account. The offline copy on this device is removed.', ok: 'Sign out' }))) return;
       await cloud.signOutUser();
       location.replace(`${location.pathname}${location.search}#/`);
       location.reload();
@@ -498,8 +538,7 @@ async function route() {
   const [, view, arg = ''] = (location.hash.replace(/^#/, '') || '/').split('/');
   if (current === 'trip' && view !== 'trip') unmountTrip();
   if (current === 'edit') { editor?.dispose(); editor = null; }
-  unsubTrip?.();
-  unsubTrip = null;
+  for (const off of cleanups.splice(0)) off();
   window.scrollTo(0, 0);
   try {
     switch (view) {
@@ -517,9 +556,15 @@ async function route() {
 }
 
 // Leaving the editor with unsaved changes asks first.
-window.addEventListener('hashchange', (e) => {
-  if (current === 'edit' && editor?.isDirty() && !confirm('Leave without saving your changes?')) {
+// A hash change can't be paused, so step back, ask, and continue only if confirmed.
+window.addEventListener('hashchange', async (e) => {
+  if (current === 'edit' && editor?.isDirty()) {
+    const target = location.hash;
     history.replaceState(null, '', new URL(e.oldURL).hash);
+    if (await ask('Leave without saving your changes?', { ok: 'Leave', cancel: 'Keep editing', danger: true })) {
+      editor.markClean();
+      location.hash = target;
+    }
     return;
   }
   route();
@@ -564,6 +609,31 @@ async function boot() {
 }
 boot();
 
+/* ============================================================
+   Versioning: tell people when a newer GoWander has been deployed
+   ============================================================ */
+const APP_VERSION = document.querySelector('meta[name="app-version"]')?.content || 'dev';
+
+let updateShown = false;
+async function checkForUpdate() {
+  if (APP_VERSION === 'dev' || updateShown) return;
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    const { version } = await res.json();
+    if (version && version !== APP_VERSION) {
+      updateShown = true;
+      toast('A new version of GoWander is available.', 'info', { duration: 0, action: { label: 'Reload', onClick: () => location.reload() } });
+    }
+  } catch { /* offline — try again later */ }
+}
+
+setTimeout(checkForUpdate, 5000);
+setInterval(checkForUpdate, 30 * 60 * 1000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkForUpdate(); });
+
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
-  navigator.serviceWorker.register('./sw.js').catch(() => {});
+  // updateViaCache: 'none' makes the browser always re-check sw.js itself, ignoring HTTP caching.
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+    .then((reg) => document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); }))
+    .catch(() => {});
 }

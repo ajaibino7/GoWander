@@ -1,9 +1,10 @@
 {
-  "name": "trip-companion",
+  "name": "gowander",
   "private": true,
   "type": "module",
   "description": "Plan trips together and follow them live. Static site + Firebase (Google sign-in, Firestore).",
   "scripts": {
+    "stamp": "node scripts/stamp.mjs",
     "serve": "npx --yes http-server -p 8080 -c-1 .",
     "emulators": "firebase emulators:start --project demo-trips --only auth,firestore",
     "test:rules": "firebase emulators:exec --project demo-trips --only firestore \"node --test tests/*.test.mjs\"",

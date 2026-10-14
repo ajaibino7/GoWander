@@ -46,3 +46,108 @@ Java HotSpot(TM) 64-Bit Server VM (build 21.0.1+12-LTS-29, mixed mode, sharing)
 
 Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
  
+[debug] [2026-10-14T09:07:56.059Z] ----------------------------------------------------------------------
+[debug] [2026-10-14T09:07:56.063Z] Command:       C:\nvm4w\nodejs\node.exe D:\Ajai\mumbai-lonavala-trip\node_modules\firebase-tools\lib\bin\firebase.js emulators:start --project demo-trips --only auth,firestore
+[debug] [2026-10-14T09:07:56.064Z] CLI Version:   13.35.1
+[debug] [2026-10-14T09:07:56.064Z] Platform:      win32
+[debug] [2026-10-14T09:07:56.064Z] Node Version:  v24.21.0
+[debug] [2026-10-14T09:07:56.064Z] Time:          Wed Oct 14 2026 14:37:56 GMT+0530 (India Standard Time)
+[debug] [2026-10-14T09:07:56.065Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-10-14T09:07:56.301Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] Failed to authenticate, have you run firebase login?
+[warn] !  emulators: You are not currently authenticated so some features may not work correctly. Please run firebase login to authenticate the CLI. 
+[debug] [2026-10-14T09:07:56.584Z] java version "21.0.1" 2023-10-17 LTS
+Java(TM) SE Runtime Environment (build 21.0.1+12-LTS-29)
+Java HotSpot(TM) 64-Bit Server VM (build 21.0.1+12-LTS-29, mixed mode, sharing)
+
+[debug] [2026-10-14T09:07:56.630Z] Parsed Java major version: 21
+[info] i  emulators: Starting emulators: auth, firestore {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: auth, firestore"}}
+[info] i  emulators: Detected demo project ID "demo-trips", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail. {"metadata":{"emulator":{"name":"hub"},"message":"Detected demo project ID \"demo-trips\", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail."}}
+[debug] [2026-10-14T09:07:56.644Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-10-14T09:07:56.644Z] [auth] Authentication Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-10-14T09:07:56.644Z] [firestore] Firestore Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-10-14T09:07:56.645Z] [firestore.websocket] websocket server for firestore only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-10-14T09:07:56.645Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"auth":[{"address":"127.0.0.1","family":"IPv4","port":9099}],"firestore":[{"address":"127.0.0.1","family":"IPv4","port":8081}],"firestore.websocket":[{"address":"127.0.0.1","family":"IPv4","port":9150}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[warn] !  emulators: It seems that you are running multiple instances of the emulator suite for project demo-trips. This may result in unexpected behavior. 
+[debug] [2026-10-14T09:07:56.651Z] [hub] writing locator at D:\Ajai\_fbtools\tmp\hub-demo-trips.json
+[debug] [2026-10-14T09:07:56.659Z] Ignoring unsupported arg: auto_download {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: auto_download"}}
+[debug] [2026-10-14T09:07:56.659Z] Ignoring unsupported arg: single_project_mode_error {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: single_project_mode_error"}}
+[debug] [2026-10-14T09:07:56.660Z] Starting Firestore Emulator with command {"binary":"java","args":["-Dgoogle.cloud_firestore.debug_log_level=FINE","-Duser.language=en","-jar","D:\\Ajai\\_fbtools\\emulators\\cloud-firestore-emulator-v1.19.8.jar","--host","127.0.0.1","--port",8081,"--websocket_port",9150,"--project_id","demo-trips","--rules","D:\\Ajai\\mumbai-lonavala-trip\\firestore.rules","--single_project_mode",true],"optionalArgs":["port","webchannel_port","host","rules","websocket_port","functions_emulator","seed_from_export","project_id","single_project_mode"],"joinArgs":false,"shell":false,"port":8081} {"metadata":{"emulator":{"name":"firestore"},"message":"Starting Firestore Emulator with command {\"binary\":\"java\",\"args\":[\"-Dgoogle.cloud_firestore.debug_log_level=FINE\",\"-Duser.language=en\",\"-jar\",\"D:\\\\Ajai\\\\_fbtools\\\\emulators\\\\cloud-firestore-emulator-v1.19.8.jar\",\"--host\",\"127.0.0.1\",\"--port\",8081,\"--websocket_port\",9150,\"--project_id\",\"demo-trips\",\"--rules\",\"D:\\\\Ajai\\\\mumbai-lonavala-trip\\\\firestore.rules\",\"--single_project_mode\",true],\"optionalArgs\":[\"port\",\"webchannel_port\",\"host\",\"rules\",\"websocket_port\",\"functions_emulator\",\"seed_from_export\",\"project_id\",\"single_project_mode\"],\"joinArgs\":false,\"shell\":false,\"port\":8081}"}}
+[info] i  firestore: Firestore Emulator logging to firestore-debug.log {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator logging to firestore-debug.log"}}
+[info] +  firestore: Firestore Emulator UI websocket is running on 9150. {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator UI websocket is running on 9150."}}
+[warn] !  emulators: The Emulator UI is not starting, either because none of the running emulators have a UI component or the Emulator UI cannot determine the Project ID. Pass the --project flag to specify a project. {"metadata":{"emulator":{"name":"hub"},"message":"The Emulator UI is not starting, either because none of the running emulators have a UI component or the Emulator UI cannot determine the Project ID. Pass the --project flag to specify a project."}}
+[debug] [2026-10-14T09:08:05.624Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+└─────────────────────────────────────────────────────────────┘
+
+┌────────────────┬────────────────┐
+│ Emulator       │ Host:Port      │
+├────────────────┼────────────────┤
+│ Authentication │ 127.0.0.1:9099 │
+├────────────────┼────────────────┤
+│ Firestore      │ 127.0.0.1:8081 │
+└────────────────┴────────────────┘
+  Emulator Hub host: 127.0.0.1 port: 4400
+  Other reserved ports: 4500, 9150
+
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 
+[info] i  firestore: Change detected, updating rules... 
+[debug] [2026-10-14T09:10:13.191Z] >>> [apiv2][query] PUT http://127.0.0.1:8081/emulator/v1/projects/demo-trips:securityRules [none]
+[debug] [2026-10-14T09:10:13.192Z] >>> [apiv2][body] PUT http://127.0.0.1:8081/emulator/v1/projects/demo-trips:securityRules {"ignore_errors":true,"rules":{"files":[{"name":"security.rules","content":"rules_version = '2';\n\n// Trips are private to their members.\n//   • Anyone signed in with Google can create a trip; they become its owner.\n//   • Only members (owner + collaborators, by Google email) can read or edit it.\n//   • Only the owner can change the member list or delete the trip.\n//   • A collaborator can remove themselves (\"leave trip\").\nservice cloud.firestore {\n  match /databases/{database}/documents {\n\n    function signedIn() {\n      return request.auth != null\n        && request.auth.token.firebase.sign_in_provider == 'google.com'\n        && request.auth.token.email is string;\n    }\n    function myEmail() { return request.auth.token.email.lower(); }\n    function isMember(data) { return signedIn() && myEmail() in data.memberEmails; }\n    function isOwner(data) { return signedIn() && request.auth.uid == data.ownerUid; }\n\n    function validTrip(d) {\n      return d.keys().hasOnly(['title', 'subtitle', 'timezone', 'days', 'ownerUid', 'ownerEmail',\n                               'memberEmails', 'createdAt', 'updatedAt', 'updatedBy'])\n        && d.title is string && d.title.size() > 0 && d.title.size() <= 120\n        && d.subtitle is string && d.subtitle.size() <= 300\n        && d.timezone is string && d.timezone.size() <= 64\n        && d.days is list && d.days.size() <= 60\n        && d.memberEmails is list && d.memberEmails.size() >= 1 && d.memberEmails.size() <= 20\n        && d.ownerEmail in d.memberEmails\n        && d.updatedBy == myEmail()\n        && d.updatedAt == request.time;\n    }\n\n    match /trips/{tripId} {\n      allow read: if isMember(resource.data);\n\n      allow create: if signedIn()\n        && validTrip(request.resource.data)\n        && request.resource.data.ownerUid == request.auth.uid\n        && request.resource.data.ownerEmail == myEmail()\n        && request.resource.data.memberEmails == [myEmail()]\n        && request.resource.data.createdAt == request.time;\n\n      // Members edit the plan; only the owner may change who the members are.\n      allow update: if isMember(resource.data)\n        && validTrip(request.resource.data)\n        && request.resource.data.ownerUid == resource.data.ownerUid\n        && request.resource.data.ownerEmail == resource.data.ownerEmail\n        && request.resource.data.createdAt == resource.data.createdAt\n        && (request.resource.data.memberEmails == resource.data.memberEmails\n            || isOwner(resource.data)\n            || leaving());\n\n      allow delete: if isOwner(resource.data);\n\n      // Shared progress (done / skipped stops). Any member can tick or untick a stop.\n      match /state/{docId} {\n        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }\n        allow read: if isMember(trip());\n        allow create, update: if docId == 'progress'\n          && isMember(trip())\n          && request.resource.data.keys().hasOnly(['done', 'updatedBy', 'updatedAt'])\n          && request.resource.data.done is map\n          && request.resource.data.done.size() <= 1000\n          && request.resource.data.updatedBy == myEmail()\n          && request.resource.data.updatedAt == request.time;\n        allow delete: if isOwner(trip());\n      }\n    }\n\n    // A collaborator removing only themselves, touching nothing else.\n    function leaving() {\n      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberEmails', 'updatedAt', 'updatedBy'])\n        && !isOwner(resource.data)\n        && request.resource.data.memberEmails.toSet() == resource.data.memberEmails.toSet().difference([myEmail()].toSet());\n    }\n  }\n}\n"}]}}
+[debug] [2026-10-14T09:10:13.735Z] <<< [apiv2][status] PUT http://127.0.0.1:8081/emulator/v1/projects/demo-trips:securityRules 200
+[debug] [2026-10-14T09:10:13.735Z] <<< [apiv2][body] PUT http://127.0.0.1:8081/emulator/v1/projects/demo-trips:securityRules {}
+[info] +  firestore: Rules updated. 
+[debug] [2026-10-14T09:23:16.002Z] ----------------------------------------------------------------------
+[debug] [2026-10-14T09:23:16.006Z] Command:       C:\nvm4w\nodejs\node.exe D:\Ajai\mumbai-lonavala-trip\node_modules\firebase-tools\lib\bin\firebase.js emulators:start --project demo-trips --only auth,firestore
+[debug] [2026-10-14T09:23:16.006Z] CLI Version:   13.35.1
+[debug] [2026-10-14T09:23:16.006Z] Platform:      win32
+[debug] [2026-10-14T09:23:16.006Z] Node Version:  v24.21.0
+[debug] [2026-10-14T09:23:16.006Z] Time:          Wed Oct 14 2026 14:53:16 GMT+0530 (India Standard Time)
+[debug] [2026-10-14T09:23:16.007Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-10-14T09:23:16.211Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] Failed to authenticate, have you run firebase login?
+[warn] !  emulators: You are not currently authenticated so some features may not work correctly. Please run firebase login to authenticate the CLI. 
+[debug] [2026-10-14T09:23:16.457Z] java version "21.0.1" 2023-10-17 LTS
+Java(TM) SE Runtime Environment (build 21.0.1+12-LTS-29)
+
+[debug] [2026-10-14T09:23:16.458Z] Java HotSpot(TM) 64-Bit Server VM (build 21.0.1+12-LTS-29, mixed mode, sharing)
+
+[debug] [2026-10-14T09:23:16.488Z] Parsed Java major version: 21
+[info] i  emulators: Starting emulators: auth, firestore {"metadata":{"emulator":{"name":"hub"},"message":"Starting emulators: auth, firestore"}}
+[info] i  emulators: Detected demo project ID "demo-trips", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail. {"metadata":{"emulator":{"name":"hub"},"message":"Detected demo project ID \"demo-trips\", emulated services will use a demo configuration and attempts to access non-emulated services for this project will fail."}}
+[debug] [2026-10-14T09:23:16.501Z] [logging] Logging Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-10-14T09:23:16.501Z] [auth] Authentication Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-10-14T09:23:16.501Z] [firestore] Firestore Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-10-14T09:23:16.501Z] [firestore.websocket] websocket server for firestore only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2026-10-14T09:23:16.501Z] assigned listening specs for emulators {"user":{"hub":[{"address":"127.0.0.1","family":"IPv4","port":4400},{"address":"::1","family":"IPv6","port":4400}],"logging":[{"address":"127.0.0.1","family":"IPv4","port":4500}],"auth":[{"address":"127.0.0.1","family":"IPv4","port":9099}],"firestore":[{"address":"127.0.0.1","family":"IPv4","port":8081}],"firestore.websocket":[{"address":"127.0.0.1","family":"IPv4","port":9150}]},"metadata":{"message":"assigned listening specs for emulators"}}
+[warn] !  emulators: It seems that you are running multiple instances of the emulator suite for project demo-trips. This may result in unexpected behavior. 
+[debug] [2026-10-14T09:23:16.506Z] [hub] writing locator at D:\Ajai\_fbtools\tmp\hub-demo-trips.json
+[debug] [2026-10-14T09:23:16.514Z] Ignoring unsupported arg: auto_download {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: auto_download"}}
+[debug] [2026-10-14T09:23:16.514Z] Ignoring unsupported arg: single_project_mode_error {"metadata":{"emulator":{"name":"firestore"},"message":"Ignoring unsupported arg: single_project_mode_error"}}
+[debug] [2026-10-14T09:23:16.514Z] Starting Firestore Emulator with command {"binary":"java","args":["-Dgoogle.cloud_firestore.debug_log_level=FINE","-Duser.language=en","-jar","D:\\Ajai\\_fbtools\\emulators\\cloud-firestore-emulator-v1.19.8.jar","--host","127.0.0.1","--port",8081,"--websocket_port",9150,"--project_id","demo-trips","--rules","D:\\Ajai\\mumbai-lonavala-trip\\firestore.rules","--single_project_mode",true],"optionalArgs":["port","webchannel_port","host","rules","websocket_port","functions_emulator","seed_from_export","project_id","single_project_mode"],"joinArgs":false,"shell":false,"port":8081} {"metadata":{"emulator":{"name":"firestore"},"message":"Starting Firestore Emulator with command {\"binary\":\"java\",\"args\":[\"-Dgoogle.cloud_firestore.debug_log_level=FINE\",\"-Duser.language=en\",\"-jar\",\"D:\\\\Ajai\\\\_fbtools\\\\emulators\\\\cloud-firestore-emulator-v1.19.8.jar\",\"--host\",\"127.0.0.1\",\"--port\",8081,\"--websocket_port\",9150,\"--project_id\",\"demo-trips\",\"--rules\",\"D:\\\\Ajai\\\\mumbai-lonavala-trip\\\\firestore.rules\",\"--single_project_mode\",true],\"optionalArgs\":[\"port\",\"webchannel_port\",\"host\",\"rules\",\"websocket_port\",\"functions_emulator\",\"seed_from_export\",\"project_id\",\"single_project_mode\"],\"joinArgs\":false,\"shell\":false,\"port\":8081}"}}
+[info] i  firestore: Firestore Emulator logging to firestore-debug.log {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator logging to firestore-debug.log"}}
+[info] +  firestore: Firestore Emulator UI websocket is running on 9150. {"metadata":{"emulator":{"name":"firestore"},"message":"Firestore Emulator UI websocket is running on 9150."}}
+[warn] !  emulators: The Emulator UI is not starting, either because none of the running emulators have a UI component or the Emulator UI cannot determine the Project ID. Pass the --project flag to specify a project. {"metadata":{"emulator":{"name":"hub"},"message":"The Emulator UI is not starting, either because none of the running emulators have a UI component or the Emulator UI cannot determine the Project ID. Pass the --project flag to specify a project."}}
+[debug] [2026-10-14T09:23:25.102Z] Could not find VSCode notification endpoint: FetchError: request to http://localhost:40001/vscode/notify failed, reason: . If you are not running the Firebase Data Connect VSCode extension, this is expected and not an issue.
+[info] 
+┌─────────────────────────────────────────────────────────────┐
+│ ✔  All emulators ready! It is now safe to connect your app. │
+└─────────────────────────────────────────────────────────────┘
+
+┌────────────────┬────────────────┐
+│ Emulator       │ Host:Port      │
+├────────────────┼────────────────┤
+│ Authentication │ 127.0.0.1:9099 │
+├────────────────┼────────────────┤
+│ Firestore      │ 127.0.0.1:8081 │
+└────────────────┴────────────────┘
+  Emulator Hub host: 127.0.0.1 port: 4400
+  Other reserved ports: 4500, 9150
+
+Issues? Report them at https://github.com/firebase/firebase-tools/issues and attach the *-debug.log files.
+ 

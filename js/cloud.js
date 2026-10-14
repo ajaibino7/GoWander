@@ -132,7 +132,12 @@ export async function watchMyTrips(user, cb, onError) {
 export async function watchTrip(id, cb, onError) {
   const { db, F } = await init();
   return F.onSnapshot(F.doc(db, 'trips', id), { includeMetadataChanges: true },
-    (snap) => cb(snap.exists() ? fromDoc(snap) : null),
+    (snap) => {
+      if (!snap.exists()) { cb(null); return; }
+      const entry = fromDoc(snap);
+      // A trip that exists but can't be parsed is an error, not a deletion.
+      if (entry) cb(entry); else onError?.('This trip has data the app can\'t read.');
+    },
     (e) => onError?.(e.code === 'permission-denied' ? 'denied' : friendly(e)));
 }
 
@@ -196,5 +201,29 @@ export async function leaveTrip(user, id) {
 
 export async function deleteTrip(id) {
   const { db, F } = await init();
+  try { await commit(F.deleteDoc(progressRef(F, db, id))); } catch { /* no progress yet */ }
   await commit(F.deleteDoc(F.doc(db, 'trips', id)));
+}
+
+/* ============================================================
+   Shared progress — which stops members have marked done / skipped.
+   Kept in trips/{id}/state/progress so ticking a stop never collides with plan edits.
+   ============================================================ */
+const progressRef = (F, db, id) => F.doc(db, 'trips', id, 'state', 'progress');
+
+// cb(Map<stopId, email>) now and on every change by any member.
+export async function watchProgress(id, cb) {
+  const { db, F } = await init();
+  return F.onSnapshot(progressRef(F, db, id),
+    (snap) => cb(new Map(Object.entries(snap.data()?.done || {}))),
+    () => cb(new Map()));
+}
+
+export async function setStopDone(user, id, stopId, on) {
+  const { db, F } = await init();
+  await commit(F.setDoc(progressRef(F, db, id), {
+    done: { [stopId]: on ? user.email : F.deleteField() },
+    updatedBy: user.email,
+    updatedAt: F.serverTimestamp(),
+  }, { merge: true }));
 }

@@ -1,6 +1,7 @@
 // Trip editor: trip details, days, stops (with locations), notes, and fixed departures.
-import { esc, KIND_LABELS, TAG_LABELS, NOTE_LABELS, toMin, fromMin, addDays, weekdayOf, makeClock, DEFAULT_TZ } from './util.js';
+import { esc, ask, KIND_LABELS, TAG_LABELS, NOTE_LABELS, toMin, fromMin, addDays, weekdayOf, makeClock, DEFAULT_TZ } from './util.js';
 import { openPlacePicker } from './placepicker.js';
+import { newStopId } from './store.js';
 
 const TIMEZONES = (() => {
   try { return Intl.supportedValuesOf('timeZone'); } catch {
@@ -8,7 +9,7 @@ const TIMEZONES = (() => {
   }
 })();
 
-const blankStop = (start = '09:00') => ({ start, end: fromMin(toMin(start) + 60), kind: 'stop', title: '', note: '', place: null });
+const blankStop = (start = '09:00') => ({ id: newStopId(), start, end: fromMin(toMin(start) + 60), kind: 'stop', title: '', note: '', place: null });
 
 function getPath(obj, path) { return path.split('.').reduce((o, k) => o?.[k], obj); }
 function setPath(obj, path, value) {
@@ -19,7 +20,7 @@ function setPath(obj, path, value) {
 }
 
 /**
- * opts: { isNew, canDelete, onSave(trip) → false if cancelled, onCancel(), onDelete(), onDuplicate(trip) }
+ * opts: { isNew, canDelete, onSave(trip) → false if cancelled, onCancel(), onReload(), onDelete(), onDuplicate(trip) }
  */
 export function mountEditor(el, trip, opts) {
   const draft = structuredClone(trip);
@@ -27,6 +28,7 @@ export function mountEditor(el, trip, opts) {
   let errors = [];
   let errorStops = new Set();
   let changed = false;
+  let noticeHtml = ''; // e.g. "Priya just saved changes" while you're editing
 
   const tzToday = () => makeClock(draft.timezone || DEFAULT_TZ).dateKey(new Date());
 
@@ -95,6 +97,7 @@ export function mountEditor(el, trip, opts) {
     const tzs = TIMEZONES.includes(draft.timezone) ? TIMEZONES : [draft.timezone, ...TIMEZONES];
     el.innerHTML = `
       <form class="editor" novalidate>
+        ${noticeHtml ? `<div class="ed-notice" role="status">${noticeHtml}</div>` : ''}
         ${errors.length ? `<div class="ed-errors" id="ed-errors" role="alert"><strong>Fix these before saving:</strong><ul>${errors.map((e) => `<li>${esc(e)}</li>`).join('')}</ul></div>` : ''}
         <section class="ed-card">
           <label class="fld"><span>Trip name</span><input data-f="title" value="${esc(draft.title)}" maxlength="120" placeholder="e.g. Goa long weekend" required></label>
@@ -204,7 +207,7 @@ export function mountEditor(el, trip, opts) {
         break;
       }
       case 'del-day':
-        if (draft.days[i].stops.length && !confirm(`Remove Day ${i + 1} and its ${draft.days[i].stops.length} stop(s)?`)) return;
+        if (draft.days[i].stops.length && !(await ask(`Remove Day ${i + 1}?`, { detail: `Its ${draft.days[i].stops.length} stop(s) will be removed too.`, ok: 'Remove day', danger: true }))) return;
         draft.days.splice(i, 1);
         break;
       case 'add-stop': {
@@ -235,14 +238,19 @@ export function mountEditor(el, trip, opts) {
         break;
       }
       case 'cancel':
-        if (changed && !confirm('Discard your unsaved changes?')) return;
+        if (changed && !(await ask('Discard your unsaved changes?', { ok: 'Discard', cancel: 'Keep editing', danger: true }))) return;
         changed = false;
         opts.onCancel();
         return;
       case 'delete':
-        if (!confirm(`Delete “${draft.title || 'this trip'}” for everyone? Members lose access too. This can't be undone.`)) return;
+        if (!(await ask(`Delete “${draft.title || 'this trip'}”?`, { detail: `It's deleted for everyone and members lose access. This can't be undone.`, ok: 'Delete trip', danger: true }))) return;
         changed = false;
         opts.onDelete();
+        return;
+      case 'reload-editor':
+        if (changed && !(await ask('Load the latest version?', { detail: 'Your unsaved edits will be lost.', ok: 'Load latest', danger: true }))) return;
+        changed = false;
+        opts.onReload();
         return;
       case 'duplicate':
         opts.onDuplicate(structuredClone(draft));
@@ -258,5 +266,14 @@ export function mountEditor(el, trip, opts) {
   window.onbeforeunload = () => (changed ? true : undefined);
 
   render();
-  return { isDirty: () => changed, dispose: () => { window.onbeforeunload = null; } };
+  return {
+    isDirty: () => changed,
+    markClean: () => { changed = false; },
+    dispose: () => { window.onbeforeunload = null; },
+    // Shows a banner above the form without touching the user's unsaved edits.
+    notice(html, offerReload = false) {
+      noticeHtml = `${html} ${offerReload ? 'Saving now will warn before overwriting. <button type="button" class="mini" data-a="reload-editor">Load their version</button>' : ''}`;
+      render();
+    },
+  };
 }
