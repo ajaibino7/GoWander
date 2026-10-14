@@ -63,24 +63,47 @@ const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.p
 // hand a calendar to Apple Calendar; only Safari (and home-screen web apps, which are Safari) can.
 const isIOSSafari = () => isIOS() && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA\/|Instagram|FBAN|FBAV|Line\/|GoogleApp/i.test(navigator.userAgent);
 
+const CAL_CACHE = 'gw-calendar';
+const slugOf = (trip) => (trip.title || 'trip').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'trip';
+
+// Waits briefly for the service worker to take control (it claims the page right after installing).
+async function swController(ms = 2500) {
+  if (!('serviceWorker' in navigator) || !('caches' in window)) return null;
+  if (navigator.serviceWorker.controller) return navigator.serviceWorker.controller;
+  await Promise.race([
+    new Promise((r) => navigator.serviceWorker.addEventListener('controllerchange', r, { once: true })),
+    new Promise((r) => setTimeout(r, ms)),
+  ]);
+  return navigator.serviceWorker.controller;
+}
+
 /**
- * Adds the trip to the phone's calendar. Returns how:
- *   'opened'      — iPhone Safari: shown as a calendar, so iOS opens Apple Calendar's "Add All" sheet.
- *                   (iOS saves downloaded .ics files to Files instead of opening Calendar.)
- *   'safari-only' — another browser on iPhone: nothing can be added; open the page in Safari.
+ * Adds the trip to the phone's calendar. Resolves with how:
+ *   'opened'      — iPhone/iPad Safari: the service worker serves the .ics at a real address
+ *                   (…/calendar/<trip>.ics) and Safari opens Apple Calendar's "Add All" sheet.
+ *                   iOS won't open calendars from downloads, data: or blob: links.
+ *   'reload'      — iPhone, but the offline helper isn't running yet (first visit): reload once.
+ *   'safari-only' — another browser on iPhone: only Safari can add to Apple Calendar.
  *   'downloaded'  — Android and computers: a .ics file the calendar app opens.
  */
-export function downloadIcs(trip) {
+export async function downloadIcs(trip) {
   const ics = tripToIcs(trip);
   if (isIOS()) {
     if (!isIOSSafari()) return 'safari-only';
-    window.location.href = `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`;
+    if (!(await swController())) return 'reload';
+    const url = new URL(`calendar/${slugOf(trip)}.ics`, location.href).href;
+    const cache = await caches.open(CAL_CACHE);
+    for (const old of await cache.keys()) await cache.delete(old); // keep only the latest
+    await cache.put(url, new Response(ics, {
+      headers: { 'Content-Type': 'text/calendar; charset=utf-8', 'Content-Disposition': `inline; filename="${slugOf(trip)}.ics"` },
+    }));
+    window.location.href = url;
     return 'opened';
   }
   const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `${(trip.title || 'trip').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'trip'}.ics`;
+  a.download = `${slugOf(trip)}.ics`;
   document.body.appendChild(a);
   a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);

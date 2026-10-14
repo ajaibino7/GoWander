@@ -6,7 +6,7 @@
 // VERSION and SHELL are written by scripts/stamp.mjs — don't edit between the build markers.
 
 // build:version
-const VERSION = 'f3c2c367';
+const VERSION = '0bb74baf';
 // /build:version
 const CACHE = `gowander-${VERSION}`;
 
@@ -21,12 +21,12 @@ const SHELL = [
   './css/app.css?v=99ffba6b58',
   './css/styles.css?v=8b049819ca',
   './js/autocover.js?v=8afe28294f',
-  './js/calendar.js?v=29ffa349f9',
+  './js/calendar.js?v=6a99a423c0',
   './js/cloud.js?v=3956b81144',
   './js/editor.js?v=5b40e8f392',
   './js/firebase-config.js?v=caeca71f59',
   './js/live.js?v=099883dea9',
-  './js/main.js?v=fc6c4571e6',
+  './js/main.js?v=a4f5036033',
   './js/nearby.js?v=8656ebc47c',
   './js/offline.js?v=8a40b2d162',
   './js/placepicker.js?v=3594d48934',
@@ -73,6 +73,17 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
 
   if (url.origin === location.origin) {
+    // "Add to calendar" on iPhone: the page leaves the trip's .ics in the gw-calendar cache and
+    // opens this address, so Safari receives a real calendar file from a real https address
+    // (it won't open calendars from data: or blob: links) and shows Apple Calendar's "Add All".
+    if (url.pathname.includes('/calendar/') && url.pathname.endsWith('.ics')) {
+      e.respondWith(caches.open('gw-calendar')
+        .then((c) => c.match(url.origin + url.pathname))
+        .then((hit) => hit || new Response('This calendar link has expired. Go back to the trip and tap "Add to calendar" again.', {
+          status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        })));
+      return;
+    }
     if (url.pathname.endsWith('/version.json')) return; // always straight from the network
     if (url.searchParams.has('v')) { e.respondWith(cacheFirst(req)); return; }
 
