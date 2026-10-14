@@ -92,6 +92,8 @@
 .chk { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
 .chk input[type="checkbox"] { width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--coral); }
 .chk.sub { padding-left: 26px; }
+.chk.big { font-size: 15px; font-weight: 600; color: var(--ink); cursor: pointer; padding: 2px 0; }
+.chk.big input[type="checkbox"] { width: 20px; height: 20px; }
 .editor input.num { width: 76px; }
 .ed-notes summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--muted); padding: 4px 0; }
 .ed-notes[open] { display: grid; gap: 8px; }

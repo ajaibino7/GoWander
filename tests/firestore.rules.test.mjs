@@ -3,7 +3,7 @@ import { test, before, after, beforeEach } from 'node:test';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 import {
-  doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, serverTimestamp, arrayRemove,
+  doc, setDoc, getDoc, updateDoc, deleteDoc, collection, query, where, getDocs, serverTimestamp, arrayRemove, arrayUnion,
 } from 'firebase/firestore';
 
 const OWNER = { uid: 'owner-uid', email: 'owner@gmail.com' };
@@ -109,6 +109,46 @@ test('the owner can remove a collaborator', async () => {
 test('the owner cannot remove themselves', async () => {
   await addFriend();
   await assertFails(updateDoc(trip(OWNER), { memberEmails: [FRIEND.email], ...stamp(OWNER) }));
+});
+
+/* ---------- joining by link ---------- */
+const linkOn = () => updateDoc(trip(OWNER), { linkJoin: true, ...stamp(OWNER) });
+const join = (u) => updateDoc(trip(u), { memberEmails: arrayUnion(u.email), ...stamp(u) });
+
+test('nobody can join by link until the owner turns it on', async () => {
+  await assertFails(join(STRANGER));
+  await assertSucceeds(linkOn());
+  await assertSucceeds(join(STRANGER));
+  await assertSucceeds(getDoc(trip(STRANGER)));
+});
+test('joining by link adds only yourself and changes nothing else', async () => {
+  await addFriend();
+  await linkOn();
+  await assertFails(updateDoc(trip(STRANGER), { memberEmails: arrayUnion(STRANGER.email, 'other@gmail.com'), ...stamp(STRANGER) }));
+  await assertFails(updateDoc(trip(STRANGER), { memberEmails: arrayUnion(STRANGER.email), title: 'mine now', ...stamp(STRANGER) }));
+  await assertFails(updateDoc(trip(STRANGER), { memberEmails: [OWNER.email, STRANGER.email], ...stamp(STRANGER) })); // drops FRIEND
+  await assertFails(updateDoc(trip(STRANGER), { memberEmails: arrayUnion(STRANGER.email), updatedAt: serverTimestamp(), updatedBy: OWNER.email }));
+});
+test('signed-out or non-Google users cannot join by link', async () => {
+  await linkOn();
+  await assertFails(updateDoc(doc(db(STRANGER, 'password'), 'trips', 't1'), { memberEmails: arrayUnion(STRANGER.email), ...stamp(STRANGER) }));
+  await assertFails(updateDoc(doc(env.unauthenticatedContext().firestore(), 'trips', 't1'), { memberEmails: arrayUnion(STRANGER.email) }));
+});
+test('only the owner can turn link joining on or off', async () => {
+  await addFriend();
+  await assertFails(updateDoc(trip(FRIEND), { linkJoin: true, ...stamp(FRIEND) }));
+  await assertSucceeds(linkOn());
+  await assertFails(updateDoc(trip(FRIEND), { linkJoin: false, ...stamp(FRIEND) }));
+  await assertSucceeds(updateDoc(trip(OWNER), { linkJoin: false, ...stamp(OWNER) }));
+  await assertFails(join(STRANGER));
+});
+test('link joining must be true or false', async () => {
+  await assertFails(updateDoc(trip(OWNER), { linkJoin: 'yes', ...stamp(OWNER) }));
+});
+test('members can still edit the plan while link joining is on', async () => {
+  await addFriend();
+  await linkOn();
+  await assertSucceeds(updateDoc(trip(FRIEND), { title: 'Goa 2', ...stamp(FRIEND) }));
 });
 
 /* ---------- shared progress (done / skipped stops) ---------- */

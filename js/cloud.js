@@ -93,6 +93,7 @@ function fromDoc(snap) {
       ownerUid: d.ownerUid,
       ownerEmail: d.ownerEmail,
       memberEmails: Array.isArray(d.memberEmails) ? d.memberEmails : [],
+      linkJoin: d.linkJoin === true,
       updatedAtMs: d.updatedAt?.toMillis?.() ?? 0, // 0 while our own write is still pending
       updatedBy: d.updatedBy || '',
       pending: snap.metadata.hasPendingWrites,
@@ -192,6 +193,25 @@ export async function updateTrip(user, id, trip, baseMs, { force = false } = {})
 export async function setMembers(user, id, emails) {
   const { db, F } = await init();
   await commit(F.updateDoc(F.doc(db, 'trips', id), { memberEmails: emails, updatedAt: F.serverTimestamp(), updatedBy: user.email }));
+}
+
+// Owner only: lets anyone who has the trip's link add themselves as a member.
+export async function setLinkJoin(user, id, on) {
+  const { db, F } = await init();
+  await commit(F.updateDoc(F.doc(db, 'trips', id), { linkJoin: on, updatedAt: F.serverTimestamp(), updatedBy: user.email }));
+}
+
+// Adds you to a trip you opened by link. The rules only allow it while the owner has link joining on.
+export async function joinTrip(user, id) {
+  if (!navigator.onLine) throw new Error('You\'re offline. Connect to the internet to join this trip.');
+  const { db, F } = await init();
+  try {
+    await F.updateDoc(F.doc(db, 'trips', id), { memberEmails: F.arrayUnion(user.email), updatedAt: F.serverTimestamp(), updatedBy: user.email });
+  } catch (e) {
+    if (e?.code === 'permission-denied') throw new Error('This trip isn\'t open to join by link, or it\'s full. Ask the owner to turn on “Anyone with the link can join”.');
+    if (e?.code === 'not-found') throw new Error('This trip no longer exists.');
+    throw new Error(friendly(e));
+  }
 }
 
 export async function leaveTrip(user, id) {

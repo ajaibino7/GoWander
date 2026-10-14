@@ -72,7 +72,9 @@
 }
 
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+/* Page zoom is off (see the viewport meta and main.js). manipulation also stops double-tap zoom;
+   the map sets its own touch-action, so pinching it still zooms the map. */
+html { -webkit-text-size-adjust: 100%; touch-action: manipulation; }
 body {
   margin: 0;
   background: var(--bg);
@@ -95,6 +97,8 @@ button { font: inherit; color: inherit; }
 .hero .skyline { position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: 70px; }
 .hero-inner { position: relative; max-width: 1100px; margin: 0 auto; }
 .eyebrow { font-size: 11px; letter-spacing: .28em; text-transform: uppercase; opacity: .85; }
+/* The hero label carries the GoWander name, so it keeps its own capitalisation. */
+.hero .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: none; }
 .hero h1 { font-family: var(--serif); font-weight: normal; font-size: clamp(34px, 8vw, 52px); line-height: 1.05; margin: 8px 0 6px; }
 .hero h1 em { color: var(--sun); }
 .hero-sub { font-size: 15px; opacity: .92; }
@@ -293,5 +297,41 @@ button { font: inherit; color: inherit; }
 .num-marker.now { background: var(--coral) !important; transform: scale(1.2); }
 .me-marker { width: 16px; height: 16px; border-radius: 50%; background: #2b7de9; border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(43, 125, 233, .35), 0 1px 4px rgba(0, 0, 0, .4); }
 .leaflet-popup-content { font-family: var(--sans); font-size: 13px; }
+.pop-actions { display: flex; gap: 12px; align-items: center; margin-top: 6px; }
+.pop-actions .link-btn { font-size: 13px; padding: 0; }
+
+/* ---------- What to do nearby ---------- */
+@media (min-width: 900px) {
+  .map-card.has-nearby #map { height: 42vh; }
+  .map-card.has-nearby .nb-list { max-height: calc(58vh - 220px); min-height: 160px; overflow-y: auto; }
+}
+.nearby { border-top: 1px solid var(--line); }
+.nb-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 12px 12px 4px; }
+.nb-head strong { font-size: 15px; }
+.nb-eyebrow { font-size: 11px; font-weight: 600; color: var(--coral-ink); letter-spacing: .04em; }
+.nb-msg { margin: 0; padding: 8px 12px 14px; font-size: 14px; color: var(--muted); }
+.nb-pad { padding: 0 12px 14px; }
+.nb-filters { display: flex; gap: 6px; padding: 6px 12px 8px; overflow-x: auto; scrollbar-width: none; }
+.nb-chip {
+  flex: 0 0 auto; font: inherit; font-size: 12px; padding: 5px 10px; border-radius: 99px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+.nb-chip span { color: var(--muted); }
+.nb-chip[aria-selected="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+.nb-chip[aria-selected="true"] span { color: rgba(255, 255, 255, .75); }
+.nb-list { list-style: none; margin: 0; padding: 0 4px; }
+.nb-list li { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 10px; cursor: pointer; min-width: 0; }
+.nb-list li:hover, .nb-list li:focus-visible { background: var(--surface-2); outline: none; }
+.nb-ic { font-size: 20px; width: 28px; text-align: center; flex: 0 0 auto; }
+.nb-main { flex: 1; min-width: 0; display: grid; }
+.nb-name { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.nb-meta { font-size: 12px; color: var(--muted); }
+.nb-pop { font-size: 10px; font-weight: 700; color: #3d2a00; background: var(--sun); border-radius: 99px; padding: 1px 6px; margin-left: 4px; white-space: nowrap; vertical-align: 1px; }
+.nb-foot { margin: 0; padding: 8px 12px 12px; font-size: 11px; color: var(--faint); }
+.nb-marker {
+  width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 2px solid var(--sea);
+  display: flex; align-items: center; justify-content: center; font-size: 15px; box-shadow: 0 1px 4px rgba(0, 0, 0, .3);
+}
+.nb-marker.pop { border-color: var(--sun); box-shadow: 0 0 0 2px rgba(242, 181, 68, .5), 0 1px 4px rgba(0, 0, 0, .3); }
 
 .site-foot { text-align: center; color: var(--faint); font-size: 12px; padding: 8px 16px calc(24px + env(safe-area-inset-bottom)); }

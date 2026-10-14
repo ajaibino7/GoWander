@@ -3,6 +3,7 @@ import {
   esc, distM, fmtDist, estimateTravel, directionsUrl, isHere, fmtDur, fmtHHMM, makeClock,
   THEMES, THEME_COLORS, TAG_LABELS, weekdayOf, shortDate, dayMonth, fmtRange,
 } from './util.js';
+import { nearbyPlaces, CATS } from './nearby.js';
 
 /* ============================================================
    Test mode (only active via URL; see README):
@@ -338,6 +339,7 @@ function renderStatus(ph, t) {
     <div class="progress" title="Day progress"><span style="width:${(st.progress * 100).toFixed(1)}%"></span></div>
     <div class="actions">
       <a class="btn" href="${directionsUrl(focus.place)}" target="_blank" rel="noopener">Directions</a>
+      <button class="btn ghost" type="button" data-nearby="${focus.id}">What to do nearby</button>
       <button class="btn ghost" type="button" data-done="${focus.id}">${st.cur ? 'Done / skip' : 'Skip this'}</button>
     </div>` : `
     <div class="now-title">That's everything for today</div>
@@ -398,6 +400,7 @@ function renderDay(t, ph) {
             ${state.selectedStop === s.id ? `
               <div class="stop-actions">
                 <a class="mini" href="${directionsUrl(s.place)}" target="_blank" rel="noopener">Directions</a>
+                <button class="mini" type="button" data-nearby="${s.id}">✨ What to do nearby</button>
                 <button class="mini" type="button" data-done="${s.id}">${state.done.has(s.id) ? 'Undo done' : 'Mark done / skip'}</button>
               </div>` : ''}
           </div>
@@ -408,7 +411,7 @@ function renderDay(t, ph) {
 }
 
 /* ---------- map ---------- */
-let map, layer, meLayer, lastMapDay = null, lastMapSig = '';
+let map, layer, meLayer, nearLayer, lastMapDay = null, lastMapSig = '';
 export const getMap = () => map;
 export function refitMap() { lastMapDay = null; lastMapSig = ''; }
 
@@ -420,6 +423,7 @@ function initMap() {
     attribution: '&copy; OpenStreetMap contributors',
   }).addTo(map);
   layer = L.layerGroup().addTo(map);
+  nearLayer = L.layerGroup().addTo(map);
   meLayer = L.layerGroup().addTo(map);
 }
 
@@ -447,7 +451,7 @@ function renderMap(t) {
     const states = g.stops.map((s) => stopState(s, t));
     const cls = states.includes('now') ? 'now' : states.every((x) => x === 'done' || x === 'past') ? 'done' : '';
     const icon = L.divIcon({ className: '', html: `<div class="num-marker ${cls}" style="background:${color}">${i + 1}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
-    const popup = `<strong>${esc(g.place.name)}</strong><br>${g.stops.map((s) => `${esc(fmtHHMM(s.start))} · ${esc(s.title)}`).join('<br>')}<br><a href="${directionsUrl(g.place)}" target="_blank" rel="noopener">Directions</a>`;
+    const popup = `<strong>${esc(g.place.name)}</strong><br>${g.stops.map((s) => `${esc(fmtHHMM(s.start))} · ${esc(s.title)}`).join('<br>')}<div class="pop-actions"><a href="${directionsUrl(g.place)}" target="_blank" rel="noopener">Directions</a><button type="button" class="link-btn" data-nearby="${g.stops[0].id}">What to do nearby</button></div>`;
     const m = L.marker([g.place.lat, g.place.lng], { icon }).bindPopup(popup).addTo(layer);
     g.stops.forEach((s) => { s._marker = m; });
     pts.push([g.place.lat, g.place.lng]);
@@ -475,6 +479,114 @@ function renderMe() {
   if (state.pos.accuracy) L.circle(ll, { radius: state.pos.accuracy, color: '#2b7de9', weight: 1, fillOpacity: 0.1 }).addTo(meLayer);
   L.marker(ll, { icon: L.divIcon({ className: '', html: '<div class="me-marker"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }), zIndexOffset: 1000 })
     .bindPopup('You are here').addTo(meLayer);
+}
+
+/* ============================================================
+   What to do nearby — panel under the map plus icon pins
+   ============================================================ */
+// { stop, status: 'loading' | 'ok' | 'error', items, filter, error }
+let nearby = null;
+let nearbyReq = 0;
+const nearMarkers = new Map();
+
+async function openNearby(stopId) {
+  const stop = DAYS.flatMap((d) => d.stops).find((s) => s.id === stopId);
+  if (!stop) return;
+  const req = ++nearbyReq;
+  nearby = { stop, status: 'loading', items: [], filter: 'all' };
+  map?.closePopup();
+  renderNearby({ fit: true });
+  // Phones show the map above the timeline: bring it into view.
+  $('nearby').closest('.map-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  try {
+    const items = await nearbyPlaces(stop.place);
+    if (req !== nearbyReq) return;
+    nearby = { ...nearby, status: 'ok', items };
+  } catch (e) {
+    if (req !== nearbyReq) return;
+    nearby = { ...nearby, status: 'error', error: e.message };
+  }
+  renderNearby({ fit: true });
+}
+
+function closeNearby() {
+  nearbyReq++;
+  nearby = null;
+  renderNearby();
+}
+
+function renderNearby({ fit = false } = {}) {
+  const el = $('nearby');
+  const card = el.closest('.map-card');
+  nearLayer?.clearLayers();
+  nearMarkers.clear();
+  const wasOpen = card.classList.contains('has-nearby');
+  card.classList.toggle('has-nearby', !!nearby);
+  if (!nearby) {
+    el.hidden = true;
+    el.innerHTML = '';
+    if (wasOpen) setTimeout(() => map?.invalidateSize(), 0);
+    return;
+  }
+  el.hidden = false;
+  const { stop, status, items, filter } = nearby;
+  const shown = filter === 'all' ? items : items.filter((x) => x.cat === filter);
+  const count = (c) => items.filter((x) => x.cat === c).length;
+  const head = `
+    <div class="nb-head">
+      <div><div class="nb-eyebrow">What to do nearby</div><strong>${esc(stop.place.name)}</strong></div>
+      <button class="icon-btn" type="button" data-nb-close aria-label="Close nearby places">✕</button>
+    </div>`;
+
+  if (status === 'loading') {
+    el.innerHTML = `${head}<p class="nb-msg">Finding things to do around here… This can take a few seconds.</p>`;
+  } else if (status === 'error') {
+    el.innerHTML = `${head}<p class="nb-msg">${esc(nearby.error)}</p><div class="nb-pad"><button class="mini" type="button" data-nb-retry>Try again</button></div>`;
+  } else if (!items.length) {
+    el.innerHTML = `${head}<p class="nb-msg">Nothing listed on OpenStreetMap within 3 km of this stop.</p>`;
+  } else {
+    el.innerHTML = `${head}
+      <div class="nb-filters" role="tablist" aria-label="Filter nearby places">
+        ${[['all', 'All', items.length], ...Object.entries(CATS).map(([k, c]) => [k, `${c.icon} ${c.label}`, count(k)])]
+          .filter(([k, , n]) => k === 'all' || n)
+          .map(([k, label, n]) => `<button class="nb-chip" type="button" role="tab" data-nb-filter="${k}" aria-selected="${filter === k}">${label} <span>${n}</span></button>`).join('')}
+      </div>
+      <ul class="nb-list">
+        ${shown.map((x) => `
+          <li data-nb-item="${esc(x.id)}" tabindex="0">
+            <span class="nb-ic" aria-hidden="true">${x.icon}</span>
+            <span class="nb-main">
+              <span class="nb-name">${esc(x.name)}${x.famous ? ' <span class="nb-pop" title="Well known: has a Wikipedia entry">★ Popular</span>' : ''}</span>
+              <span class="nb-meta">${esc(x.label)} · ${fmtDist(x.dist)} from stop</span>
+            </span>
+            <a class="mini" href="${directionsUrl(x)}" target="_blank" rel="noopener">Go</a>
+          </li>`).join('')}
+      </ul>
+      <p class="nb-foot">From OpenStreetMap. Well-known places first, then the closest. Check opening hours before you go.</p>`;
+  }
+
+  if (!map) return;
+  // Pins for what's listed, plus a ring around the stop they're near.
+  L.circle([stop.place.lat, stop.place.lng], { radius: 80, color: '#e8704f', weight: 2, fillOpacity: 0.08 }).addTo(nearLayer);
+  for (const x of shown) {
+    const icon = L.divIcon({ className: '', html: `<div class="nb-marker${x.famous ? ' pop' : ''}">${x.icon}</div>`, iconSize: [28, 28], iconAnchor: [14, 14] });
+    const popup = `<strong>${esc(x.name)}</strong><br>${esc(x.label)} · ${fmtDist(x.dist)} from ${esc(stop.place.name)}<div class="pop-actions"><a href="${directionsUrl(x)}" target="_blank" rel="noopener">Directions</a>${x.wiki ? `<a href="${esc(x.wiki)}" target="_blank" rel="noopener">About</a>` : ''}</div>`;
+    nearMarkers.set(x.id, L.marker([x.lat, x.lng], { icon }).bindPopup(popup).addTo(nearLayer));
+  }
+  if (!wasOpen) setTimeout(() => map.invalidateSize(), 0);
+  if (fit) {
+    const pts = [[stop.place.lat, stop.place.lng], ...shown.map((x) => [x.lat, x.lng])];
+    setTimeout(() => (pts.length > 1 ? map.fitBounds(pts, { padding: [30, 30], maxZoom: 16 }) : map.setView(pts[0], 15)), 0);
+  }
+}
+
+function focusNearby(id) {
+  const x = nearby?.items.find((i) => i.id === id);
+  const m = nearMarkers.get(id);
+  if (!x || !m || !map) return;
+  map.setView([x.lat, x.lng], Math.max(map.getZoom(), 16));
+  m.openPopup();
+  $('map').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 /* ============================================================
@@ -536,10 +648,20 @@ function wire() {
       render();
       return;
     }
+    const nb = e.target.closest('[data-nearby], [data-nb-close], [data-nb-retry], [data-nb-filter], [data-nb-item]');
+    if (nb && !e.target.closest('a')) {
+      if (nb.dataset.nearby) openNearby(nb.dataset.nearby);
+      else if ('nbClose' in nb.dataset) closeNearby();
+      else if ('nbRetry' in nb.dataset) openNearby(nearby.stop.id);
+      else if (nb.dataset.nbFilter) { nearby.filter = nb.dataset.nbFilter; renderNearby({ fit: true }); }
+      else if (nb.dataset.nbItem) focusNearby(nb.dataset.nbItem);
+      return;
+    }
     const tab = e.target.closest('[data-day]');
     if (tab) {
       state.selectedDay = Number(tab.dataset.day);
       state.selectedStop = null;
+      closeNearby();
       render();
       return;
     }
@@ -556,7 +678,7 @@ function wire() {
     }
   });
   $('view-trip').addEventListener('keydown', (e) => {
-    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-stop]')) { e.preventDefault(); e.target.click(); }
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-stop], [data-nb-item]')) { e.preventDefault(); e.target.click(); }
   });
   $('loc-btn').addEventListener('click', () => {
     if (state.posSource === 'sim' || state.loc === 'on' || state.loc === 'asking') return;
@@ -588,6 +710,7 @@ export function mountTrip(trip, { onDone = null } = {}) {
   }
   state.selectedDay = null;
   state.selectedStop = null;
+  closeNearby();
   state.done = onDone ? new Set() : loadDone();
   state.doneBy = new Map();
   refitMap();
@@ -608,6 +731,7 @@ export function mountTrip(trip, { onDone = null } = {}) {
 
 export function unmountTrip() {
   TRIP = null;
+  closeNearby();
   clearInterval(timer);
   timer = null;
   if (state.posSource === 'gps') { stopWatch(); state.pos = null; state.posSource = null; state.loc = 'idle'; }

@@ -202,25 +202,41 @@ function showTripObject(trip, opts) {
   mountTrip(trip, { onDone: opts.onDone });
 }
 
+// Opening a trip you're not in: offer to join. Firebase only lets it through if the owner
+// has turned on "Anyone with the link can join".
 function showDenied(id) {
-  setHero({ eyebrow: 'Trip', title: 'No access', nav: backLink() });
+  setHero({ eyebrow: 'Trip invite', title: 'Join this trip', nav: backLink() });
   $('view-import').innerHTML = `
     <section class="ed-card">
-      <h2 class="sec-h">You're not a member of this trip</h2>
-      <p class="fine">You're signed in as <strong>${esc(user.email)}</strong>. Ask the trip's owner to add this exact Google email under <em>Members</em>, then open the link again.</p>
+      <h2 class="sec-h">You've been invited to a trip</h2>
+      <p class="fine">Join as <strong>${esc(user.email)}</strong> to see the plan, follow it live and edit it with everyone else.</p>
       <div class="home-actions">
+        <button class="btn" type="button" data-join>Join trip</button>
         <button class="btn ghost" type="button" data-a="switch-account">Use a different Google account</button>
-        <a class="btn ghost" href="#/">Back to my trips</a>
       </div>
+      <p class="fine" id="join-help" hidden></p>
     </section>`;
   showView('import');
-  $('hero-nav').dataset.trip = id;
+  $('view-import').onclick = async (e) => {
+    const b = e.target.closest('[data-join]');
+    if (!b) return;
+    b.disabled = true;
+    try {
+      await cloud.joinTrip(user, id);
+      toast('You joined the trip', 'ok');
+      route();
+    } catch (err) {
+      b.disabled = false;
+      $('join-help').hidden = false;
+      $('join-help').textContent = `${err.message} They can also add ${user.email} under Members.`;
+    }
+  };
 }
 
 async function showTrip(id) {
   const sample = samples.find((t) => t.id === id);
   if (sample) { showTripObject(sample, { sample: true }); return; }
-  if (!user) { showHome({ message: 'Sign in to open this trip. You need to be one of its members.' }); return; }
+  if (!user) { showHome({ message: 'Sign in with Google to open or join this trip.' }); return; }
 
   // Done/skip marks are shared: ticking a stop shows up for every member.
   const onDone = (stopId, on) => cloud.setStopDone(user, id, stopId, on).catch((e) => toast(e.message, 'bad'));
@@ -334,7 +350,22 @@ function renderMembers({ trip, meta }) {
   setHero({ eyebrow: 'Trip members', title: trip.title, sub: `${meta.memberEmails.length} member${meta.memberEmails.length === 1 ? '' : 's'}`, nav: backLink(`#/trip/${enc(trip.id)}`, 'Back to trip') });
   $('site-foot').textContent = 'Only members can open this trip. Access is enforced by Firebase security rules.';
   const members = [meta.ownerEmail, ...meta.memberEmails.filter((m) => m !== meta.ownerEmail)];
+  const full = meta.memberEmails.length >= MAX_MEMBERS;
   $('view-members').innerHTML = `
+    <section class="ed-card">
+      <h2 class="sec-h">Invite people</h2>
+      ${owner
+        ? `<label class="chk big"><input type="checkbox" data-link-join${meta.linkJoin ? ' checked' : ''}> Anyone with the link can join</label>`
+        : `<p class="fine"><strong>${meta.linkJoin ? 'Anyone with the link can join.' : 'Only people the owner adds by email can join.'}</strong></p>`}
+      <p class="fine">${meta.linkJoin
+        ? `Send this link to friends. They open it, sign in with Google and tap <em>Join trip</em>. No need to type their email.${full ? ` <strong>This trip is full (${MAX_MEMBERS} members).</strong>` : ''}`
+        : (owner ? 'Turn this on to let people join with just the link. Otherwise, add their Google email below first, then send them the link.' : 'Send this link to people the owner has added by email.')}</p>
+      <div class="invite-row">
+        <input class="invite-url" readonly value="${esc(invite)}" aria-label="Invite link">
+        <button class="btn" type="button" data-invite="${esc(invite)}">${navigator.share ? 'Share' : 'Copy'}</button>
+      </div>
+    </section>
+
     <section class="ed-card">
       <h2 class="sec-h">Who can see and edit this trip</h2>
       <ul class="members">
@@ -348,20 +379,11 @@ function renderMembers({ trip, meta }) {
       </ul>
       ${owner ? `
         <form id="add-member" class="add-member" novalidate>
-          <input type="email" name="email" placeholder="friend@gmail.com" autocomplete="off" aria-label="Collaborator's Google email" ${meta.memberEmails.length >= MAX_MEMBERS ? 'disabled' : ''}>
-          <button class="btn" type="submit" ${meta.memberEmails.length >= MAX_MEMBERS ? 'disabled' : ''}>Add</button>
+          <input type="email" name="email" placeholder="Or add by email: friend@gmail.com" autocomplete="off" aria-label="Collaborator's Google email" ${full ? 'disabled' : ''}>
+          <button class="btn ghost" type="submit" ${full ? 'disabled' : ''}>Add</button>
         </form>
         <p class="fine">Use the email of their <strong>Google account</strong>. Members can view and edit the plan. Only you can add or remove people or delete the trip.</p>`
         : `<p class="fine">${esc(meta.ownerEmail)} owns this trip and manages who's in it.</p>`}
-    </section>
-
-    <section class="ed-card">
-      <h2 class="sec-h">Invite link</h2>
-      <p class="fine">After adding someone, send them this link. They open it, sign in with that Google account, and the trip appears in their list.</p>
-      <div class="invite-row">
-        <input class="invite-url" readonly value="${esc(invite)}" aria-label="Invite link">
-        <button class="btn ghost" type="button" data-invite="${esc(invite)}">${navigator.share ? 'Share' : 'Copy'}</button>
-      </div>
     </section>
 
     <section class="ed-card">
@@ -379,6 +401,15 @@ function renderMembers({ trip, meta }) {
   showView('members');
 
   const view = $('view-members');
+  view.querySelector('[data-link-join]')?.addEventListener('change', async (e) => {
+    const on = e.target.checked;
+    e.target.disabled = true;
+    try {
+      await cloud.setLinkJoin(user, trip.id, on);
+      toast(on ? 'Anyone with the link can now join' : 'Link joining turned off. Only people you add by email can join.', 'ok');
+    } catch (err) { e.target.checked = !on; toast(err.message, 'bad'); }
+    e.target.disabled = false;
+  });
   view.querySelector('#add-member')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = String(new FormData(e.target).get('email') || '').trim().toLowerCase();
@@ -608,6 +639,20 @@ async function boot() {
   });
 }
 boot();
+
+/* ============================================================
+   No page zoom. The viewport meta covers Android; iOS Safari ignores it, so block its pinch
+   gestures too, and Ctrl + wheel / Ctrl +/-/0 on desktop. The map handles its own zoom first,
+   so it still zooms.
+   ============================================================ */
+for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) {
+  document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+}
+document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 && !e.target.closest?.('#map')) e.preventDefault(); }, { passive: false });
+document.addEventListener('wheel', (e) => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && ['+', '=', '-', '_', '0'].includes(e.key)) e.preventDefault();
+});
 
 /* ============================================================
    Versioning: tell people when a newer GoWander has been deployed
