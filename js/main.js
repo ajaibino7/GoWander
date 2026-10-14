@@ -173,7 +173,7 @@ function card(trip, i, { badges = '', actions = '', members = [] } = {}) {
             <circle cx="18" cy="92" r="4" fill="rgba(255,255,255,.8)"/><circle cx="150" cy="50" r="3" fill="rgba(255,255,255,.7)"/>
           </svg>
           ${first ? `<div class="tc-date"><b>${Number(day)}</b><span>${esc(mon)}</span></div>` : ''}
-          <span class="chip ${st.key}">${st.key === 'live' ? '<span class="live-dot"></span>' : ''}${esc(st.label)}</span>
+          <span class="chip st-${st.key}">${st.key === 'live' ? '<span class="live-dot"></span>' : ''}${esc(st.label)}</span>
         </div>
         <div class="tc-body">
           <h3>${esc(trip.title)}</h3>

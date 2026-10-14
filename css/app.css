@@ -57,9 +57,9 @@
 }
 .tc-date b { font-family: var(--serif); font-size: 22px; font-weight: normal; }
 .tc-date span { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--coral-ink); margin-top: 3px; }
-.tc-banner .chip, .tc-banner .chip.soon { background: rgba(255, 255, 255, .92); color: var(--navy); box-shadow: 0 2px 8px rgba(0, 0, 0, .12); display: inline-flex; align-items: center; gap: 6px; }
-.tc-banner .chip.live { background: var(--coral); color: #fff; }
-.tc-banner .chip.past { background: rgba(255, 255, 255, .75); color: var(--muted); }
+.tc-banner .chip, .tc-banner .chip.st-soon { background: rgba(255, 255, 255, .92); color: var(--navy); box-shadow: 0 2px 8px rgba(0, 0, 0, .12); display: inline-flex; align-items: center; gap: 6px; }
+.tc-banner .chip.st-live { background: var(--coral); color: #fff; }
+.tc-banner .chip.st-past { background: rgba(255, 255, 255, .75); color: var(--muted); }
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: blink 1.4s ease-in-out infinite; }
 @keyframes blink { 50% { opacity: .35; } }
 .tc-body { padding: 14px 16px 6px; }
@@ -85,8 +85,8 @@
 .av.more { background: var(--surface-2); color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { .trip-card, .live-dot { transition: none; animation: none; } }
 .chip { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 3px 9px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
-.chip.live { background: var(--coral); color: #fff; }
-.chip.soon { background: var(--info-bg); color: var(--info); }
+.chip.st-live { background: var(--coral); color: #fff; }
+.chip.st-soon { background: var(--info-bg); color: var(--info); }
 .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
 .badge.pub { background: var(--ok-bg); color: var(--ok); }
 .badge.dirty { background: var(--warn-bg); color: var(--warn); }
@@ -106,6 +106,19 @@
   padding: 8px 10px; width: 100%; min-width: 0;
 }
 .editor textarea { resize: vertical; }
+/* iOS Safari draws date/time fields its own way: centred text, its own height, and a minimum
+   width that can push past the card. Make them match the other inputs (iOS only — the
+   -webkit-touch-callout check is true only there, so desktop keeps its calendar picker). */
+@supports (-webkit-touch-callout: none) {
+  .editor input[type="date"], .editor input[type="time"] {
+    -webkit-appearance: none; appearance: none; display: block; max-width: 100%;
+    min-height: 40px; line-height: 22px; text-align: left; font-size: 16px;
+  }
+  .editor input[type="date"]::-webkit-date-and-time-value,
+  .editor input[type="time"]::-webkit-date-and-time-value { text-align: left; margin: 0; min-height: 22px; }
+  .editor input[type="date"]::-webkit-datetime-edit,
+  .editor input[type="time"]::-webkit-datetime-edit { padding: 0; }
+}
 .editor input:focus, .editor select:focus, .editor textarea:focus, .settings-form input:focus, .modal input:focus, .modal select:focus {
   outline: 2px solid color-mix(in srgb, var(--sea) 60%, transparent); outline-offset: 0; border-color: var(--sea);
 }
@@ -130,6 +143,15 @@
 .ed-row > input:not(.t) { flex: 1 1 160px; width: auto; }
 .editor input.t { width: 132px; flex: 0 0 auto; font-variant-numeric: tabular-nums; padding-right: 6px; }
 .dash { color: var(--muted); }
+/* Reorder buttons on each stop, and a brief highlight on the stop that just moved. */
+.ed-move { display: inline-flex; gap: 2px; margin-left: auto; }
+.ed-move + .icon-btn { margin-left: 0; }
+.ed-move .icon-btn { font-size: 17px; font-weight: 700; color: var(--sea); }
+.ed-move .icon-btn:hover { color: var(--sea); background: var(--surface-2); border-color: var(--line); }
+.ed-move .icon-btn:disabled { opacity: .3; cursor: default; background: none; border-color: transparent; }
+.ed-stop.moved { animation: moved 1.2s ease-out; }
+@keyframes moved { from { box-shadow: 0 0 0 3px color-mix(in srgb, var(--sea) 55%, transparent); } to { box-shadow: 0 0 0 3px transparent; } }
+@media (prefers-reduced-motion: reduce) { .ed-stop.moved { animation: none; } }
 .title-in { font-weight: 600; }
 .icon-btn { background: none; border: 1px solid transparent; color: var(--muted); border-radius: 8px; width: 32px; height: 32px; cursor: pointer; font-size: 14px; flex: 0 0 auto; }
 .icon-btn:hover { background: var(--surface-2); border-color: var(--line); color: var(--bad); }

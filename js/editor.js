@@ -45,6 +45,25 @@ async function prepareCover(file) {
   throw new Error('That image is too detailed to fit in 500 KB. Try a smaller one.');
 }
 
+// Swaps stops k and k+1. Stops are kept in time order, so the one moving up takes the earlier
+// slot: each keeps its duration and the gap between them, and the pair ends when it did before.
+function swapStops(stops, k) {
+  const a = stops[k], b = stops[k + 1];
+  const ok = (s) => /^\d\d:\d\d$/.test(s.start || '') && /^\d\d:\d\d$/.test(s.end || '');
+  if (ok(a) && ok(b)) {
+    const dur = (s) => Math.max(0, toMin(s.end) - toMin(s.start));
+    const start = toMin(a.start);
+    const gap = Math.max(0, toMin(b.start) - toMin(a.end));
+    const da = dur(a), db = dur(b);
+    b.start = fromMin(start);
+    b.end = fromMin(start + db);
+    a.start = fromMin(start + db + gap);
+    a.end = fromMin(start + db + gap + da);
+  }
+  stops[k] = b;
+  stops[k + 1] = a;
+}
+
 const blankStop = (start = '09:00') => ({ id: newStopId(), start, end: fromMin(toMin(start) + 60), kind: 'stop', title: '', note: '', place: null });
 
 function getPath(obj, path) { return path.split('.').reduce((o, k) => o?.[k], obj); }
@@ -108,7 +127,7 @@ export function mountEditor(el, trip, opts) {
 
   const tzToday = () => makeClock(draft.timezone || DEFAULT_TZ).dateKey(new Date());
 
-  function stopHtml(s, i, j) {
+  function stopHtml(s, i, j, stopsLen) {
     const p = `days.${i}.stops.${j}`;
     const bad = errorStops.has(`${i}.${j}`);
     return `
@@ -118,6 +137,10 @@ export function mountEditor(el, trip, opts) {
           <span class="dash">–</span>
           <input type="time" class="t" data-f="${p}.end" value="${esc(s.end)}" aria-label="End time" required>
           <select data-f="${p}.kind" aria-label="Type">${Object.entries(KIND_LABELS).map(([k, v]) => `<option value="${k}"${s.kind === k ? ' selected' : ''}>${v}</option>`).join('')}</select>
+          <span class="ed-move">
+            <button type="button" class="icon-btn" data-a="move-stop" data-dir="-1" data-d="${i}" data-s="${j}" title="Move earlier" aria-label="Move stop ${j + 1} earlier"${j === 0 ? ' disabled' : ''}>↑</button>
+            <button type="button" class="icon-btn" data-a="move-stop" data-dir="1" data-d="${i}" data-s="${j}" title="Move later" aria-label="Move stop ${j + 1} later"${j === stopsLen - 1 ? ' disabled' : ''}>↓</button>
+          </span>
           <button type="button" class="icon-btn" data-a="del-stop" data-d="${i}" data-s="${j}" title="Remove stop" aria-label="Remove stop">✕</button>
         </div>
         <input class="title-in" data-f="${p}.title" value="${esc(s.title)}" maxlength="160" placeholder="What's the plan? e.g. Sunset at Chapora Fort" aria-label="Stop title">
@@ -158,7 +181,7 @@ export function mountEditor(el, trip, opts) {
           <label class="fld"><span>Date</span><input type="date" data-f="days.${i}.date" value="${esc(d.date)}" required></label>
           <label class="fld"><span>Day title</span><input data-f="days.${i}.title" value="${esc(d.title)}" maxlength="160" placeholder="e.g. North Goa beaches"></label>
         </div>
-        <div class="ed-stops">${d.stops.map((s, j) => stopHtml(s, i, j)).join('') || '<div class="muted small">No stops yet.</div>'}</div>
+        <div class="ed-stops">${d.stops.map((s, j) => stopHtml(s, i, j, d.stops.length)).join('') || '<div class="muted small">No stops yet.</div>'}</div>
         <button type="button" class="btn ghost small" data-a="add-stop" data-d="${i}">+ Add stop</button>
         <details class="ed-notes"${d.notes.length ? ' open' : ''}>
           <summary>Notes &amp; tips (${d.notes.length})</summary>
@@ -311,6 +334,21 @@ export function mountEditor(el, trip, opts) {
       case 'del-stop':
         draft.days[i].stops.splice(j, 1);
         break;
+      case 'move-stop': {
+        const stops = draft.days[i].stops;
+        const to = j + Number(b.dataset.dir);
+        if (to < 0 || to >= stops.length) return;
+        swapStops(stops, Math.min(j, to));
+        errorStops = new Set(); // indexes changed; validation runs again on save
+        changed = true;
+        render();
+        // Keep the moved stop in view and flash it so it's easy to follow.
+        const moved = document.getElementById(`stop-${i}-${to}`);
+        moved?.classList.add('moved');
+        moved?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        moved?.querySelector(`[data-a="move-stop"][data-dir="${b.dataset.dir}"]:not(:disabled)`)?.focus({ preventScroll: true });
+        return;
+      }
       case 'add-note':
         draft.days[i].notes.push({ type: 'tip', title: '', text: '' });
         break;
