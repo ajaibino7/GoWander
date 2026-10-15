@@ -154,18 +154,25 @@ service cloud.firestore {
         allow create: if isMember(trip()) && validExpense(request.resource.data, trip().memberEmails)
           && request.resource.data.createdBy == myEmail()
           && request.resource.data.createdAt == request.time;
-        allow update: if isMember(trip()) && validExpense(request.resource.data, trip().memberEmails)
+        // Only the person who added an expense (or recorded a payment) changes or removes it.
+        allow update: if isMember(trip()) && resource.data.createdBy == myEmail()
+          && validExpense(request.resource.data, trip().memberEmails)
           && request.resource.data.createdBy == resource.data.createdBy
           && request.resource.data.createdAt == resource.data.createdAt;
-        allow delete: if isMember(trip());
+        allow delete: if isMember(trip()) && resource.data.createdBy == myEmail();
       }
 
       // Photos for bills and journal entries (id "bill-<expenseId>" or "j-<entryId>"), one per
       // document. The app shrinks them to well under 300 KB.
+      // A bill photo belongs to its expense: only whoever added the expense adds, replaces or
+      // removes it (or anyone tidies one up once its expense is gone).
       match /photos/{photoId} {
         function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        function bill() { return /databases/$(database)/documents/trips/$(tripId)/expenses/$(photoId.split('-')[1]); }
+        function billIsMine() { return !photoId.matches('bill-.*') || (exists(bill()) && get(bill()).data.createdBy == myEmail()); }
+        function billGone() { return photoId.matches('bill-.*') && !exists(bill()); }
         allow read: if isMember(trip());
-        allow create, update: if isMember(trip())
+        allow create, update: if isMember(trip()) && billIsMine()
           && photoId.matches('(bill|j)-[A-Za-z0-9_-]{1,40}')
           && request.resource.data.keys().hasOnly(['data', 'createdBy', 'createdAt'])
           && request.resource.data.data is string
@@ -173,7 +180,7 @@ service cloud.firestore {
           && request.resource.data.data.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+')
           && request.resource.data.createdBy == myEmail()
           && request.resource.data.createdAt == request.time;
-        allow delete: if isMember(trip());
+        allow delete: if isMember(trip()) && (billIsMine() || billGone());
       }
 
       // Ideas board: places someone would like to visit. Any member adds ideas and likes them;
@@ -262,6 +269,23 @@ service cloud.firestore {
           && nickname(request.resource.data) is string && nickname(request.resource.data).size() <= 30
           && request.resource.data.updatedAt == request.time;
         allow delete: if email == myEmail() || isOwner(trip());
+      }
+
+      // Settle-up reminders: "from" asks "to" to pay them back. One per pair (id "<from>__<to>"),
+      // so reminding again replaces the last one. Either of the two can clear it.
+      match /reminders/{pairId} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        allow read: if isMember(trip());
+        allow create, update: if isMember(trip())
+          && request.resource.data.keys().hasOnly(['from', 'to', 'amount', 'currency', 'createdAt'])
+          && request.resource.data.from == myEmail()
+          && request.resource.data.to is string && request.resource.data.to in trip().memberEmails
+          && request.resource.data.to != myEmail()
+          && pairId == request.resource.data.from + '__' + request.resource.data.to
+          && request.resource.data.amount is number && request.resource.data.amount > 0 && request.resource.data.amount <= 100000000
+          && request.resource.data.currency is string && request.resource.data.currency.matches('[A-Z]{3}')
+          && request.resource.data.createdAt == request.time;
+        allow delete: if isMember(trip()) && (resource.data.from == myEmail() || resource.data.to == myEmail());
       }
 
       // "Where's everyone": a member's live location, only while they choose to share it.

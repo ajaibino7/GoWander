@@ -111,14 +111,14 @@
    width that can push past the card. Make them match the other inputs (iOS only — the
    -webkit-touch-callout check is true only there, so desktop keeps its calendar picker). */
 @supports (-webkit-touch-callout: none) {
-  .editor input[type="date"], .editor input[type="time"] {
-    -webkit-appearance: none; appearance: none; display: block; max-width: 100%;
+  input[type="date"], input[type="time"] {
+    -webkit-appearance: none; appearance: none; display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0;
     min-height: 40px; line-height: 22px; text-align: left; font-size: 16px;
   }
-  .editor input[type="date"]::-webkit-date-and-time-value,
-  .editor input[type="time"]::-webkit-date-and-time-value { text-align: left; margin: 0; min-height: 22px; }
-  .editor input[type="date"]::-webkit-datetime-edit,
-  .editor input[type="time"]::-webkit-datetime-edit { padding: 0; }
+  input[type="date"]::-webkit-date-and-time-value,
+  input[type="time"]::-webkit-date-and-time-value { text-align: left; margin: 0; min-height: 22px; }
+  input[type="date"]::-webkit-datetime-edit,
+  input[type="time"]::-webkit-datetime-edit { padding: 0; }
 }
 .editor input:focus, .editor select:focus, .editor textarea:focus, .form input:focus, .form select:focus, .settings-form input:focus, .modal input:focus, .modal select:focus {
   outline: 2px solid color-mix(in srgb, var(--sea) 60%, transparent); outline-offset: 0; border-color: var(--sea);

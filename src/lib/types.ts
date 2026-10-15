@@ -164,6 +164,8 @@ export interface Budget { perPerson: number; currency: string }
 
 /** A member's details for the group: their nickname (shown instead of their email) and UPI ID. */
 export interface Profile { email: string; upi: string; nickname: string }
+/** "from" asked "to" to pay them back (settle-up). */
+export interface Reminder { from: string; to: string; amount: number; currency: string; atMs: number }
 
 /** Where a member is right now, if they chose to share it. */
 export interface MemberLocation {

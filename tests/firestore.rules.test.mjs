@@ -309,13 +309,18 @@ const newExp = (u, extra = {}) => ({
   createdBy: u.email, createdAt: serverTimestamp(), ...stamp(u), ...extra,
 });
 
-test('members can log, edit and delete expenses', async () => {
+test('members log expenses; only whoever added one edits or deletes it', async () => {
   await addFriend();
   await assertSucceeds(setDoc(exp(FRIEND), newExp(FRIEND)));
   await assertSucceeds(getDoc(exp(OWNER)));
-  await assertSucceeds(updateDoc(exp(OWNER), { amount: 1500, ...stamp(OWNER) }));
+  // Not even the trip's owner can change or remove someone else's expense.
+  await assertFails(updateDoc(exp(OWNER), { amount: 1500, ...stamp(OWNER) }));
+  await assertFails(deleteDoc(exp(OWNER)));
+  await assertSucceeds(updateDoc(exp(FRIEND), { amount: 1500, ...stamp(FRIEND) }));
   await assertSucceeds(setDoc(exp(OWNER, 'e2'), newExp(OWNER, { title: 'Paid back', kind: 'settlement', paidBy: OWNER.email, split: [FRIEND.email] })));
-  await assertSucceeds(deleteDoc(exp(OWNER)));
+  await assertFails(deleteDoc(exp(FRIEND, 'e2')));
+  await assertSucceeds(deleteDoc(exp(OWNER, 'e2')));
+  await assertSucceeds(deleteDoc(exp(FRIEND)));
 });
 test('strangers cannot see or log expenses', async () => {
   await addFriend();
@@ -349,10 +354,22 @@ const newPhoto = (u, data = img()) => ({ data, createdBy: u.email, createdAt: se
 
 test('members store, read and remove photos; strangers cannot', async () => {
   await addFriend();
+  await assertSucceeds(setDoc(photo(FRIEND, 'j-x'), newPhoto(FRIEND)));
+  await assertSucceeds(getDoc(photo(OWNER, 'j-x')));
+  await assertFails(getDoc(photo(STRANGER, 'j-x')));
+  await assertFails(setDoc(photo(STRANGER, 'j-y'), newPhoto(STRANGER)));
+  await assertSucceeds(deleteDoc(photo(OWNER, 'j-x')));
+});
+test('a bill photo belongs to whoever added the expense', async () => {
+  await addFriend();
+  await assertFails(setDoc(photo(FRIEND), newPhoto(FRIEND))); // no expense e1 yet
+  await setDoc(exp(FRIEND), newExp(FRIEND));
   await assertSucceeds(setDoc(photo(FRIEND), newPhoto(FRIEND)));
   await assertSucceeds(getDoc(photo(OWNER)));
-  await assertFails(getDoc(photo(STRANGER)));
-  await assertFails(setDoc(photo(STRANGER, 'j-x'), newPhoto(STRANGER)));
+  await assertFails(setDoc(photo(OWNER), newPhoto(OWNER)));
+  await assertFails(deleteDoc(photo(OWNER)));
+  // Once the expense is gone, its leftover photo can be tidied up.
+  await deleteDoc(exp(FRIEND));
   await assertSucceeds(deleteDoc(photo(OWNER)));
 });
 test('photos must be small images with a known id', async () => {
@@ -360,6 +377,32 @@ test('photos must be small images with a known id', async () => {
   await assertFails(setDoc(photo(OWNER), newPhoto(OWNER, 'data:text/html;base64,PHNjcmlwdD4=')));
   await assertFails(setDoc(photo(OWNER, 'avatar'), newPhoto(OWNER)));
   await assertFails(setDoc(photo(OWNER), { ...newPhoto(OWNER), createdBy: FRIEND.email }));
+});
+
+/* ---------- settle-up reminders ---------- */
+const reminder = (u, id) => doc(db(u), 'trips', 't1', 'reminders', id);
+const newReminder = (from, to, extra = {}) => ({ from: from.email, to: to.email, amount: 300, currency: 'INR', createdAt: serverTimestamp(), ...extra });
+
+test('a member reminds another to pay; either of them can clear it', async () => {
+  await addFriend();
+  const id = `${OWNER.email}__${FRIEND.email}`;
+  await assertSucceeds(setDoc(reminder(OWNER, id), newReminder(OWNER, FRIEND)));
+  await assertSucceeds(setDoc(reminder(OWNER, id), newReminder(OWNER, FRIEND, { amount: 250 }))); // reminding again
+  await assertSucceeds(getDoc(reminder(FRIEND, id)));
+  await assertFails(getDoc(reminder(STRANGER, id)));
+  await assertSucceeds(deleteDoc(reminder(FRIEND, id)));
+  await setDoc(reminder(OWNER, id), newReminder(OWNER, FRIEND));
+  await assertSucceeds(deleteDoc(reminder(OWNER, id)));
+});
+test('reminders are only sent as yourself, to a member, with a sensible amount', async () => {
+  await addFriend();
+  await assertFails(setDoc(reminder(FRIEND, `${OWNER.email}__${FRIEND.email}`), newReminder(OWNER, FRIEND))); // pretending to be the owner
+  await assertFails(setDoc(reminder(OWNER, `${OWNER.email}__${STRANGER.email}`), newReminder(OWNER, STRANGER)));
+  await assertFails(setDoc(reminder(OWNER, `${OWNER.email}__${OWNER.email}`), newReminder(OWNER, OWNER)));
+  await assertFails(setDoc(reminder(OWNER, 'anything'), newReminder(OWNER, FRIEND)));
+  await assertFails(setDoc(reminder(OWNER, `${OWNER.email}__${FRIEND.email}`), newReminder(OWNER, FRIEND, { amount: 0 })));
+  await assertFails(setDoc(reminder(OWNER, `${OWNER.email}__${FRIEND.email}`), newReminder(OWNER, FRIEND, { note: 'pay up' })));
+  await assertFails(setDoc(reminder(STRANGER, `${STRANGER.email}__${FRIEND.email}`), newReminder(STRANGER, FRIEND)));
 });
 
 /* ---------- ideas board ---------- */
