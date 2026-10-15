@@ -32,7 +32,9 @@ export function describe(code: number | undefined): WeatherLook {
 // °F only for devices actually set up in the US (US English is also the default on many laptops
 // elsewhere, so the language alone isn't enough); °C everywhere else.
 const deviceTz = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; } })();
-export const UNIT: 'C' | 'F' = (navigator.language || '').toLowerCase() === 'en-us' && /^(America|US|Pacific\/Honolulu)/.test(deviceTz) ? 'F' : 'C';
+// (navigator may be missing outside a browser, e.g. the unit tests on Node 20.)
+const lang = typeof navigator === 'undefined' ? '' : navigator.language || '';
+export const UNIT: 'C' | 'F' = lang.toLowerCase() === 'en-us' && /^(America|US|Pacific\/Honolulu)/.test(deviceTz) ? 'F' : 'C';
 
 const dateAdd = (key: string, n: number): string => {
   const d = new Date(`${key}T12:00:00Z`);
