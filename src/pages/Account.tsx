@@ -1,5 +1,6 @@
-// #/account — who you're signed in as, sign out, and backup (download / import trips.json).
-import { useRef } from 'react';
+// #/account — who you're signed in as, your name in GoWander, sign out, and backup
+// (download / import trips.json).
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppData } from '../app/AppData';
 import { importFile, signOutAndReload } from '../app/actions';
@@ -8,6 +9,9 @@ import { BackLink } from '../components/Hero';
 import { Page } from '../components/Page';
 import * as cloud from '../lib/cloud';
 import * as store from '../lib/store';
+import { firstName } from '../lib/greeting';
+import { toast } from '../lib/toast';
+import type { User } from '../lib/types';
 import { SignInCard } from './Home';
 
 export function AccountPage() {
@@ -33,6 +37,7 @@ export function AccountPage() {
             <p className="fine">Collaborators add you by this email address.</p>
             <div><button className="btn ghost" type="button" onClick={signOutAndReload}>Sign out</button></div>
           </section>
+          <NameCard user={user} />
           <section className="ed-card">
             <h2 className="sec-h">Backup</h2>
             <p className="fine">Download every trip you're a member of as a <code>trips.json</code> file, or import one. Imported trips are added to your account with only you as a member.</p>
@@ -50,5 +55,45 @@ export function AccountPage() {
         </>
       )}
     </Page>
+  );
+}
+
+// Your name in GoWander: used to greet you on the home screen (and suggested as your name on
+// new trips). Saved to your account, so all your devices see it.
+function NameCard({ user }: { user: User }) {
+  const [edit, setEdit] = useState(false);
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const shown = user.name.includes('@') ? '' : user.name;
+  const start = () => { setValue(shown); setEdit(true); };
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = value.trim().replace(/\s+/g, ' ');
+    setSaving(true);
+    try {
+      await cloud.setMyName(n);
+      setEdit(false);
+      toast(n ? `Nice to meet you, ${n.split(' ')[0]}!` : 'Back to the name from your Google account', 'ok');
+    } catch (err) { toast((err as Error).message, 'bad'); }
+    setSaving(false);
+  };
+  return (
+    <section className="ed-card name-card">
+      <div className="sec-row">
+        <h2 className="sec-h">Your name</h2>
+        {edit ? null : <button className="link-btn" type="button" onClick={start}>{shown ? 'Change' : 'Add your name'}</button>}
+      </div>
+      {edit ? (
+        <form className="nick-form" noValidate onSubmit={save}>
+          <span className="nick-av" aria-hidden="true">{(value.trim()[0] || user.email[0] || '?').toUpperCase()}</span>
+          <input autoFocus maxLength={40} placeholder="e.g. Ajai Bino" autoComplete="name" value={value} onChange={(e) => setValue(e.target.value)} aria-label="Your name" />
+          <button className="btn ghost" type="button" onClick={() => setEdit(false)}>Cancel</button>
+          <button className="btn" type="submit" disabled={saving || value.trim() === shown}>{saving ? 'Saving…' : 'Save'}</button>
+        </form>
+      ) : (
+        <p className="name-show"><strong>{shown || firstName(user)}</strong>{shown ? null : <span className="muted small"> (from your email)</span>}</p>
+      )}
+      <p className="fine">GoWander greets you by this name. Your name on each trip is set on that trip’s Members page; leave this empty to use your Google name.</p>
+    </section>
   );
 }

@@ -53,7 +53,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     cloud.onUserChange((u) => {
       // Same person again (e.g. a token refresh): keep the existing object so nothing re-renders.
-      setUser((prev) => (prev?.uid === u?.uid && prev?.email === u?.email ? prev : u));
+      setUser((prev) => (prev?.uid === u?.uid && prev?.email === u?.email && prev?.name === u?.name && prev?.photo === u?.photo ? prev : u));
       setAuthReady(true);
     }).then((unsub) => { if (cancelled) unsub?.(); else off = unsub; });
     return () => { cancelled = true; off?.(); };
@@ -69,7 +69,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     cloud.watchMyTrips(user, (list) => { setMyTrips(list); setMyTripsLoaded(true); }, (err) => { setMyTripsLoaded(true); toast(err, 'bad'); })
       .then((u) => { if (cancelled) u(); else off = u; });
     return () => { cancelled = true; off?.(); };
-  }, [user]);
+  }, [user?.uid, user?.email]); // eslint-disable-line react-hooks/exhaustive-deps -- a new name needn't reload the trips
 
   // Keep the snapshot for next time up to date (trips and their photos), a moment after changes.
   useEffect(() => {

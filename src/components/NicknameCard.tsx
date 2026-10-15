@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { lastNickname, rememberNickname } from '../app/names';
 import * as cloud from '../lib/cloud';
+import { firstName } from '../lib/greeting';
 import { toast } from '../lib/toast';
 import type { User } from '../lib/types';
 
@@ -13,7 +14,8 @@ export function NicknameCard({ tripId, user, current, onDismiss }: {
 }) {
   const [value, setValue] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const shown = value ?? (current || lastNickname());
+  // Suggest the name you used last time, else your first name.
+  const shown = value ?? (current || lastNickname() || firstName(user));
   const changed = shown.trim() !== current;
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
