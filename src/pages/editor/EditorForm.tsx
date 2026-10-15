@@ -8,6 +8,9 @@ import {
 } from '../../lib/editing';
 import type { DraftStop, DraftTrip, NoteType, Place, StopKind, StopTag } from '../../lib/types';
 import { PlacePicker } from './PlacePicker';
+import { cachedNearby } from '../../lib/nearby';
+import { dayLegs } from '../../lib/routing';
+import { suggestDay, withoutNotes, type SuggestStop } from '../../lib/suggest';
 
 const TIMEZONES: string[] = (() => {
   try { return (Intl as unknown as { supportedValuesOf: (k: string) => string[] }).supportedValuesOf('timeZone'); } catch {
@@ -68,6 +71,35 @@ export function EditorForm(props: Props) {
   };
 
   const rules = useMemo(() => dateRules(props.savedDates, draft.timezone), [props.savedDates, draft.timezone]);
+
+  // "Add suggested notes": the day's lasting smart tips (not the weather, which changes) become
+  // ordinary notes that can be edited or removed before saving.
+  const [suggesting, setSuggesting] = useState<number | null>(null);
+  const addSuggestions = async (i: number) => {
+    const day = draft.days[i];
+    if (!day) return;
+    const stops = day.stops.filter((s): s is SuggestStop => !!s.place && !!s.start && !!s.end);
+    if (!stops.length) { toast('Add stops with times and places first, then try again.', 'info'); return; }
+    setSuggesting(i);
+    const legs = await dayLegs(stops).catch(() => undefined); // travel times, if reachable
+    setSuggesting(null);
+    const room = Math.max(0, 10 - day.notes.length);
+    const fresh = withoutNotes(suggestDay({ date: day.date, stops, legs, nearby: cachedNearby }), day.notes)
+      .filter((t) => t.lasting)
+      .slice(0, room)
+      .map((t) => ({ type: t.noteType, title: t.title.slice(0, 60), text: t.text }));
+    if (!fresh.length) {
+      toast(room ? 'No new suggestions for this day. Add labels like "Must see" or a fixed departure for more.' : 'This day already has the most notes it can hold (10).', 'info');
+      return;
+    }
+    update((x) => {
+      const target = x.days[i]?.date === day.date ? x.days[i] : x.days.find((dd) => dd.date === day.date);
+      if (!target) return;
+      const known = new Set(target.notes.map((n) => n.text.trim()));
+      for (const n of fresh) if (!known.has(n.text) && target.notes.length < 10) target.notes.push(n);
+    });
+    toast(`Added ${fresh.length} suggested note${fresh.length === 1 ? '' : 's'} to Day ${i + 1}. Edit or remove any, then save.`, 'ok');
+  };
 
   // Keep a stop that just moved in view and flash it, so it's easy to follow.
   useEffect(() => {
@@ -284,7 +316,12 @@ export function EditorForm(props: Props) {
                 <textarea rows={2} maxLength={600} placeholder="Tip or reminder for this day" aria-label="Note text" value={n.text} onChange={(e) => update((x) => { const note = x.days[i]?.notes[k]; if (note) note.text = e.target.value; })} />
               </div>
             ))}
-            <button type="button" className="btn ghost small" onClick={() => update((x) => { x.days[i]?.notes.push({ type: 'tip', title: '', text: '' }); })}>+ Add note</button>
+            <div className="ed-note-actions">
+              <button type="button" className="btn ghost small" onClick={() => update((x) => { x.days[i]?.notes.push({ type: 'tip', title: '', text: '' }); })}>+ Add note</button>
+              <button type="button" className="btn ghost small suggest-btn" disabled={suggesting === i} onClick={() => addSuggestions(i)}>
+                {suggesting === i ? <><span className="spin" aria-hidden="true" /> Checking…</> : <>✨ Add suggested notes</>}
+              </button>
+            </div>
           </details>
         </section>
       ))}

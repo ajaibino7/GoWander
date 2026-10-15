@@ -241,6 +241,17 @@ function fetchOverpass(body: string): Promise<{ elements?: OsmElement[] }> {
 
 const memo = new Map<string, NearbyItem[]>();
 
+/** Nearby places already looked up on this device (no network), or null. */
+export function cachedNearby(place: LatLng): NearbyItem[] | null {
+  const key = cacheKey(place);
+  const known = memo.get(key);
+  if (known) return known;
+  try {
+    const hit = JSON.parse(localStorage.getItem(key) || 'null');
+    return hit && Array.isArray(hit.items) ? hit.items : null;
+  } catch { return null; }
+}
+
 // Everything worth suggesting around a place, nearest first. Rank it for a stop with forStop.
 export async function nearbyPlaces(place: LatLng): Promise<NearbyItem[]> {
   const key = cacheKey(place);

@@ -2,18 +2,25 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Firebase is loaded with import() (src/lib/cloud.ts), so normally the browser only asks for it
-// once the app's own code has downloaded and run. Every start needs it straight away (sign-in and
-// the trip list), so this tells the browser to fetch it alongside the app code instead.
-function preloadFirebase(): Plugin {
+// Tells the browser to fetch what every start needs alongside the app code, instead of only once
+// the code asks for it:
+//   - Firebase, loaded with import() (src/lib/cloud.ts) but needed at once (sign-in, trip list);
+//   - the main font files, which the browser otherwise finds only after applying the CSS.
+function preloadCritical(): Plugin {
   return {
-    name: 'gowander-preload-firebase',
+    name: 'gowander-preload-critical',
     apply: 'build',
     transformIndexHtml: {
       order: 'post',
       handler(_html, ctx) {
-        const chunks = Object.values(ctx.bundle || {}).filter((c) => c.type === 'chunk' && c.name === 'firebase');
-        return chunks.map((c) => ({ tag: 'link', attrs: { rel: 'modulepreload', crossorigin: '', href: `./${c.fileName}` }, injectTo: 'head' as const }));
+        const files = Object.values(ctx.bundle || {});
+        const firebase = files.filter((c) => c.type === 'chunk' && c.name === 'firebase')
+          .map((c) => ({ tag: 'link', attrs: { rel: 'modulepreload', crossorigin: '', href: `./${c.fileName}` }, injectTo: 'head' as const }));
+        // Lato's three Latin font files (regular, bold, black) that every page uses: fetched with
+        // the stylesheet, so the first paint already has the right font (no visible swap).
+        const fonts = files.filter((a) => a.type === 'asset' && /^assets\/lato-latin-(400|700|900)-normal-.*\.woff2$/.test(a.fileName))
+          .map((a) => ({ tag: 'link', attrs: { rel: 'preload', as: 'font', type: 'font/woff2', crossorigin: '', href: `./${a.fileName}` }, injectTo: 'head-prepend' as const }));
+        return [...fonts, ...firebase];
       },
     },
   };
@@ -22,7 +29,7 @@ function preloadFirebase(): Plugin {
 export default defineConfig({
   // Relative paths, so the built site works under any folder (e.g. github.io/GoWander/).
   base: './',
-  plugins: [react(), preloadFirebase()],
+  plugins: [react(), preloadCritical()],
   build: {
     outDir: 'dist',
     // scripts/postbuild.mjs reads this to write the offline cache list into sw.js.

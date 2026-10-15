@@ -14,6 +14,7 @@
     "deploy:rules": "firebase deploy --only firestore:rules"
   },
   "dependencies": {
+    "@fontsource/lato": "5.2.7",
     "firebase": "10.14.1",
     "leaflet": "1.9.4",
     "react": "18.3.1",

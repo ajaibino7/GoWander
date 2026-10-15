@@ -9,6 +9,7 @@ import {
   live, now, openNearby, selectDay, stopState, toggleDone, toggleStop, type LiveDay, type LiveStop, type Phase,
 } from '../../lib/live';
 import { mapFocusStop } from './TripMap';
+import { DayTips } from './DayTips';
 
 export function DayTabs({ phase }: { phase: Phase }) {
   const todayN = 'day' in phase ? phase.day.n : undefined;
@@ -95,6 +96,7 @@ export function DayView({ phase, onNearby }: { phase: Phase; onNearby: (stopId: 
           <div className="day-wx soft">Forecast from {dayMonth(from)}</div>
         ) : null}
       </div>
+      {live.trip ? <DayTips day={day} tripId={live.trip.id} /> : null}
       <ol className="timeline">
         {day.stops.map((s) => {
           const ss = stopState(s, t);
