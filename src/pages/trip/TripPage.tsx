@@ -27,6 +27,8 @@ import { RunningLateSheet } from './RunningLate';
 import { GroupPanel, useGroupSharing } from './GroupMap';
 import { profilesLoaded, useTripProfiles } from '../../app/names';
 import { NicknameCard } from '../../components/NicknameCard';
+import { useReminders } from '../../app/reminders';
+import { ReminderCard } from '../SettleUp';
 
 interface ViewProps {
   trip: Trip;
@@ -52,6 +54,8 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
   const shared = !!entry && !!user && !sample && !preview;
   useGroupSharing(shared ? trip.id : null, shared ? user : null);
   const profiles = useTripProfiles(shared ? trip.id : null);
+  // Settle-up reminders other members sent you ("Asha is reminding you to pay ₹200").
+  const reminders = useReminders(shared ? trip.id : null);
   // Once per trip, on a group trip: ask what to call you (until you pick a name or say not now).
   const [nickHidden, setNickHidden] = useState(() => { try { return !!localStorage.getItem(`gw-nick-skip-${trip.id}`); } catch { return false; } });
   const askNick = shared && !nickHidden && (entry?.meta.memberEmails.length || 0) > 1 && profilesLoaded(trip.id) && !profiles.get(user.email)?.nickname;
@@ -145,6 +149,7 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
       >
         <div className="col-main">
           <StatusCard onNearby={onNearby} onLate={entry && user && canEditTrip(entry.meta, user) ? setLateDay : undefined} />
+          {shared && user ? <ReminderCard tripId={trip.id} reminders={reminders} user={user} /> : null}
           {askNick && user ? <NicknameCard tripId={trip.id} user={user} current="" onDismiss={skipNick} /> : null}
           {preview ? null : <TripTools trip={trip} sample={sample} onGroup={openGroup} />}
           <DayTabs phase={phase} />

@@ -3,11 +3,14 @@
 //     category and by person), and settling up: what's still owed, person to person, with a
 //     Pay button that opens your UPI app with the person and amount filled in.
 //   Add: what, how much, category, who paid, split equally or by amount, and a bill photo.
-//   All: every expense and settlement, with the bill photo a tap away.
+//   All: every expense and settlement, with the bill photo a tap away. Only whoever added an
+//     expense (or recorded a payment) can edit or delete it.
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { TripSubPage, type TripCtx } from '../app/TripSubPage';
 import { useLeaving, useNewItems, useReveal } from '../app/motion';
 import { useProfiles } from '../app/names';
+import { useReminders } from '../app/reminders';
 import { nameOf } from '../app/useTripWatch';
 import { Bars, Donut } from '../components/Charts';
 import { Avatars, Icon, avatarColor } from '../components/Icons';
@@ -20,7 +23,7 @@ import {
 } from '../lib/expenses';
 import { ask, toast } from '../lib/toast';
 import { dayMonth, fmtRange, makeClock } from '../lib/util';
-import type { Budget, Expense, ExpenseCategory, ExpenseInput, Profile, TripEntry, User } from '../lib/types';
+import type { Budget, Expense, ExpenseCategory, ExpenseInput, Profile, Reminder, TripEntry, User } from '../lib/types';
 import { SettleUp } from './SettleUp';
 
 type Tab = 'overview' | 'add' | 'all';
@@ -46,7 +49,12 @@ function ExpensesBody({ ctx, entry, user }: { ctx: TripCtx; entry: TripEntry; us
   const [expenses, setExpenses] = useState<Expense[] | null>(null);
   const [budget, setBudgetState] = useState<Budget | null | undefined>(undefined);
   const profiles = useProfiles();
-  const [tab, setTabState] = useState<Tab>(lastTab);
+  const reminders = useReminders(id);
+  // "?pay=<email>" (a reminder's Pay button on the trip page): open that payment once.
+  const [params, setParams] = useSearchParams();
+  const [payTo] = useState(() => params.get('pay'));
+  useEffect(() => { if (params.has('pay')) setParams({}, { replace: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [tab, setTabState] = useState<Tab>(payTo ? 'overview' : lastTab);
   const setTab = (t: Tab) => { lastTab = t; setTabState(t); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const [editing, setEditing] = useState<string | null>(null);
   const [viewBill, setViewBill] = useState<Expense | null>(null);
@@ -81,7 +89,9 @@ function ExpensesBody({ ctx, entry, user }: { ctx: TripCtx; entry: TripEntry; us
 
   const list = expenses || [];
   const who = (e: string) => nameOf(e, user);
+  const mine = (x: Expense) => x.createdBy === user.email;
   const startEdit = (x: Expense) => {
+    if (!mine(x)) return;
     setEditing(x.id);
     setForm({
       title: x.title, amount: String(x.amount), currency: x.currency, paidBy: x.paidBy, split: [...x.split], date: x.date,
@@ -92,6 +102,7 @@ function ExpensesBody({ ctx, entry, user }: { ctx: TripCtx; entry: TripEntry; us
     setTab('add');
   };
   const removeExpense = async (x: Expense) => {
+    if (!mine(x)) return;
     if (!(await ask(`Delete “${x.title}”?`, { detail: 'Balances update for everyone.', ok: 'Delete', danger: true }))) return;
     if (editing === x.id) { setEditing(null); setForm(blankForm()); }
     await leave(x.id, async () => {
@@ -106,14 +117,16 @@ function ExpensesBody({ ctx, entry, user }: { ctx: TripCtx; entry: TripEntry; us
 
   return (
     <div ref={ref} style={{ display: 'contents' }}>
-      <div className="ex-tabs" role="tablist" aria-label="Expenses">
+      <div className="ex-tabs" role="tablist" aria-label="Expenses" style={{ '--i': tabs.findIndex(([t]) => t === tab) } as React.CSSProperties}>
+        {/* The highlight that slides to the chosen tab. */}
+        <span className="ex-ind" aria-hidden="true" />
         {tabs.map(([t, label]) => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} className={`ex-tab${tab === t ? ' on' : ''}`} onClick={() => setTab(t)}>{label}</button>
         ))}
       </div>
 
       {tab === 'overview' ? (
-        <Overview ctx={ctx} entry={entry} user={user} list={list} budget={budget} profiles={profiles} who={who} onAdd={() => setTab('add')} />
+        <Overview ctx={ctx} entry={entry} user={user} list={list} budget={budget} profiles={profiles} reminders={reminders} payTo={payTo} who={who} onAdd={() => setTab('add')} />
       ) : tab === 'add' ? (
         <AddForm
           entry={entry} user={user} form={form} setForm={setForm} editing={editing} who={who}
@@ -133,18 +146,20 @@ function ExpensesBody({ ctx, entry, user }: { ctx: TripCtx; entry: TripEntry; us
                     <span className="ex-title">{x.kind === 'settlement' ? `${who(x.paidBy)} paid ${who(x.split[0] || '')}` : x.title}</span>
                     <span className="ex-meta">{fmtRange(x.date, x.date)} · {x.kind === 'settlement'
                       ? 'Settle-up payment'
-                      : `Paid by ${who(x.paidBy)} · ${x.shares ? 'split by amount' : x.split.length === members.length ? 'split with everyone' : `split ${x.split.length} way${x.split.length === 1 ? '' : 's'}`}`}</span>
+                      : `Paid by ${who(x.paidBy)} · ${x.shares ? 'split by amount' : x.split.length === members.length ? 'split with everyone' : `split ${x.split.length} way${x.split.length === 1 ? '' : 's'}`}`}
+                      {!mine(x) && x.createdBy !== x.paidBy ? ` · added by ${who(x.createdBy)}` : ''}</span>
                   </span>
                   <span className="ex-amtv">{money(x.amount, x.currency)}</span>
                   <span className="ex-actions">
                     {x.hasBill ? <button className="icon-link" type="button" title="See the bill" aria-label={`Bill for ${x.title}`} onClick={() => setViewBill(x)}><Icon.camera /></button> : null}
-                    {x.kind === 'settlement' ? null : <button className="icon-link" type="button" title="Edit" aria-label={`Edit ${x.title}`} onClick={() => startEdit(x)}><Icon.edit /></button>}
-                    <button className="icon-btn" type="button" title="Delete" aria-label={`Delete ${x.title}`} onClick={() => removeExpense(x)}>✕</button>
+                    {mine(x) && x.kind !== 'settlement' ? <button className="icon-link" type="button" title="Edit" aria-label={`Edit ${x.title}`} onClick={() => startEdit(x)}><Icon.edit /></button> : null}
+                    {mine(x) ? <button className="icon-btn" type="button" title="Delete" aria-label={`Delete ${x.title}`} onClick={() => removeExpense(x)}>✕</button> : null}
                   </span>
                 </li>
               );
             }) : <li className="muted small">Expenses you add appear here.</li>}
           </ul>
+          {list.some((x) => !mine(x)) ? <p className="fine">Only the person who added an expense can edit or delete it.</p> : null}
         </section>
       )}
 
@@ -156,8 +171,9 @@ function ExpensesBody({ ctx, entry, user }: { ctx: TripCtx; entry: TripEntry; us
 /* ============================================================
    Overview: totals, budget, settle up, charts
    ============================================================ */
-function Overview({ ctx, entry, user, list, budget, profiles, who, onAdd }: {
-  ctx: TripCtx; entry: TripEntry; user: User; list: Expense[]; budget: Budget | null | undefined; profiles: Map<string, Profile>; who: (e: string) => string; onAdd: () => void;
+function Overview({ ctx, entry, user, list, budget, profiles, reminders, payTo, who, onAdd }: {
+  ctx: TripCtx; entry: TripEntry; user: User; list: Expense[]; budget: Budget | null | undefined; profiles: Map<string, Profile>;
+  reminders: Reminder[]; payTo: string | null; who: (e: string) => string; onAdd: () => void;
 }) {
   const by = balances(list);
   const me = user.email;
@@ -202,7 +218,7 @@ function Overview({ ctx, entry, user, list, budget, profiles, who, onAdd }: {
 
       <BudgetCard ctx={ctx} entry={entry} user={user} budget={budget} list={list} />
 
-      <SettleUp entry={entry} user={user} list={list} profiles={profiles} />
+      <SettleUp entry={entry} user={user} list={list} profiles={profiles} reminders={reminders} payTo={payTo} />
 
       {cats.length ? (
         <section className="ed-card ov-card">

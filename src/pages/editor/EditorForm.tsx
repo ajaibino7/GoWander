@@ -22,9 +22,20 @@ const TIMEZONES: string[] = (() => {
 function BookingFields({ booking, onChange }: { booking: Booking | undefined; onChange: (key: keyof Booking, value: string) => void }) {
   const b = booking || {};
   const filled = Object.values(b).filter(Boolean).length;
+  // The fields are only built once it's opened: a long trip has dozens of these, mostly closed,
+  // and building them all made the editor slow to open.
+  const [open, setOpen] = useState(filled > 0);
   return (
-    <details className="ed-booking" open={filled > 0 || undefined}>
+    <details className="ed-booking" open={open || undefined} onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>🎫 Tickets &amp; booking{filled ? <span className="ed-count">{filled}</span> : <span className="muted"> · PNR, booking ref, phone, link</span>}</summary>
+      {open ? <BookingInputs b={b} onChange={onChange} /> : null}
+    </details>
+  );
+}
+
+function BookingInputs({ b, onChange }: { b: Booking; onChange: (key: keyof Booking, value: string) => void }) {
+  return (
+    <>
       <div className="grid2">
         <label className="fld"><span>Train PNR</span><input inputMode="numeric" maxLength={14} placeholder="10-digit PNR" value={b.pnr || ''} onChange={(e) => onChange('pnr', e.target.value)} /></label>
         <label className="fld"><span>Booking reference</span><input maxLength={60} placeholder="e.g. 6E-ABC123" value={b.ref || ''} onChange={(e) => onChange('ref', e.target.value)} /></label>
@@ -32,7 +43,7 @@ function BookingFields({ booking, onChange }: { booking: Booking | undefined; on
         <label className="fld"><span>Ticket or booking link</span><input type="url" maxLength={500} placeholder="https://…" value={b.link || ''} onChange={(e) => onChange('link', e.target.value)} /></label>
       </div>
       <label className="fld"><span>Booking note</span><input maxLength={300} placeholder="e.g. Coach B2, seats 33–36 · check-in from 2 PM" value={b.note || ''} onChange={(e) => onChange('note', e.target.value)} /></label>
-    </details>
+    </>
   );
 }
 
@@ -363,13 +374,21 @@ export function EditorForm(props: Props) {
         </section>
       )}
 
+      {/* A floating dock: where you stand (saved or not) and the two actions. */}
       <div className="ed-bar">
-        <button type="button" className="btn ghost" onClick={async () => {
-          if (dirty && !(await ask('Discard your unsaved changes?', { ok: 'Discard', cancel: 'Keep editing', danger: true }))) return;
-          clean();
-          props.onCancel();
-        }}>Cancel</button>
-        <button type="submit" className="btn" disabled={saving}>Save trip</button>
+        <div className="ed-dock">
+          <span className={`ed-state${dirty ? ' dirty' : ''}`} aria-live="polite">
+            <i aria-hidden="true" />{saving ? 'Saving…' : dirty ? 'Unsaved changes' : props.isNew ? 'New trip' : 'No changes yet'}
+          </span>
+          <span className="ed-acts">
+            <button type="button" className="btn ghost" onClick={async () => {
+              if (dirty && !(await ask('Discard your unsaved changes?', { ok: 'Discard', cancel: 'Keep editing', danger: true }))) return;
+              clean();
+              props.onCancel();
+            }}>Cancel</button>
+            <button type="submit" className="btn" disabled={saving}>{saving ? <span className="spin" aria-hidden="true" /> : null}Save trip</button>
+          </span>
+        </div>
       </div>
 
       {picker && pickerStop ? (

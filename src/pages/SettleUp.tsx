@@ -1,15 +1,17 @@
 // Settling up: what each person still owes each other person — netted both ways, minus what's
 // already been paid back — so only the remaining amount ever shows. "Pay" opens your UPI app with
 // that person and the amount filled in; when you come back, one tap records the payment and the
-// balances update for everyone.
-import { useEffect, useState } from 'react';
+// balances update for everyone. "Remind" nudges someone in the app, or by a message in any chat app.
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { displayName } from '../app/names';
+import { ago } from '../app/reminders';
 import { Avatars } from '../components/Icons';
 import { Sheet } from '../components/Sheet';
 import * as cloud from '../lib/cloud';
 import { isUpiId, money, pairwiseDebts, round2, upiLink, type Debt } from '../lib/expenses';
 import { ask, toast } from '../lib/toast';
-import type { Expense, Profile, TripEntry, User } from '../lib/types';
+import type { Expense, Profile, Reminder, TripEntry, User } from '../lib/types';
 import { makeClock } from '../lib/util';
 import qrcode from 'qrcode-generator';
 
@@ -25,10 +27,22 @@ async function recordPayment(user: User, entry: TripEntry, d: Debt, amount: numb
   });
 }
 
-export function SettleUp({ entry, user, list, profiles }: { entry: TripEntry; user: User; list: Expense[]; profiles: Map<string, Profile> }) {
+const quiet = (p: Promise<unknown>) => { p.catch(() => {}); };
+
+export function SettleUp({ entry, user, list, profiles, reminders, payTo }: {
+  entry: TripEntry; user: User; list: Expense[]; profiles: Map<string, Profile>; reminders: Reminder[];
+  /** Open the payment to this person straight away (from a reminder on the trip page). */
+  payTo?: string | null;
+}) {
   const me = user.email;
+  const tripId = entry.trip.id;
   const debts = pairwiseDebts(list);
   const [paying, setPaying] = useState<Debt | null>(null);
+  // Opened from a reminder: open that payment as soon as the balance with them is known.
+  const pendingPay = useRef(payTo || null);
+  const payToDebt = pendingPay.current ? debts.find((d) => d.from === me && d.to === pendingPay.current) : undefined;
+  useEffect(() => { if (payToDebt) { pendingPay.current = null; setPaying(payToDebt); } }, [payToDebt]);
+  const [reminding, setReminding] = useState<Debt | null>(null);
   // The open payment follows the live balance (someone else may record a payment meanwhile).
   const payingNow = paying && debts.find((d) => d.from === paying.from && d.to === paying.to && d.currency === paying.currency);
   useEffect(() => { if (paying && !payingNow) setPaying(null); }, [paying, payingNow]);
@@ -37,6 +51,16 @@ export function SettleUp({ entry, user, list, profiles }: { entry: TripEntry; us
   const others = debts.filter((d) => d.from !== me && d.to !== me);
   const myUpi = profiles.get(me)?.upi || '';
   const anyReal = list.some((x) => x.kind !== 'settlement');
+  const reminderFor = (from: string, to: string) => reminders.find((r) => r.from === from && r.to === to);
+  const remindingNow = reminding && toMe.find((d) => d.from === reminding.from && d.currency === reminding.currency);
+  useEffect(() => { if (reminding && !remindingNow) setReminding(null); }, [reminding, remindingNow]);
+
+  // Reminders about debts that are now paid off have done their job: clear them.
+  const stale = reminders.filter((r) => (r.to === me || r.from === me) && !debts.some((d) => d.from === r.to && d.to === r.from));
+  const staleKey = stale.map((r) => `${r.from}>${r.to}`).join();
+  useEffect(() => {
+    if (anyReal) stale.forEach((r) => quiet(cloud.clearReminder(tripId, r.from, r.to)));
+  }, [staleKey, anyReal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const received = async (d: Debt) => {
     if (!(await ask(`Did ${displayName(d.from)} pay you ${money(d.amount, d.currency)}?`, { detail: 'This records the payment, and their balance with you goes to zero.', ok: 'Yes, I got it' }))) return;
@@ -46,20 +70,12 @@ export function SettleUp({ entry, user, list, profiles }: { entry: TripEntry; us
     if (!(await ask(`${displayName(d.from)} paid ${displayName(d.to)} ${money(d.amount, d.currency)}?`, { detail: 'Records the payment for both of them.', ok: 'Mark paid' }))) return;
     try { await recordPayment(user, entry, d, d.amount); toast('Payment recorded', 'ok'); } catch (e) { toast((e as Error).message, 'bad'); }
   };
-  const remind = async (d: Debt) => {
-    const text = `Hi ${displayName(d.from)}! For our trip “${entry.trip.title}”, you owe me ${money(d.amount, d.currency)}.${myUpi && d.currency === 'INR' ? ` My UPI ID: ${myUpi}` : ''} (You can also pay from the trip's Expenses page in GoWander.)`;
-    try {
-      if (typeof navigator.share === 'function') await navigator.share({ text });
-      else { await navigator.clipboard.writeText(text); toast('Reminder copied. Paste it into a chat.', 'ok'); }
-    } catch (e) { if ((e as Error).name !== 'AbortError') window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener'); }
-  };
-
   if (!anyReal) return null;
   return (
     <section className="ed-card ov-card settle">
       <h2 className="sec-h">Settle up</h2>
       {!debts.length ? (
-        <div className="settled"><span aria-hidden="true">🎉</span><div><strong>All settled up</strong><span className="muted small">Nobody owes anybody anything.</span></div></div>
+        <div className="su-done"><span aria-hidden="true">🎉</span><div><strong>All settled up</strong><span className="muted small">Nobody owes anybody anything.</span></div></div>
       ) : (
         <>
           <p className="fine">What's left to pay, person to person. Payments already made are taken off.</p>
@@ -70,7 +86,10 @@ export function SettleUp({ entry, user, list, profiles }: { entry: TripEntry; us
                 {mine.map((d) => (
                   <li key={`${d.currency}:${d.to}`} className="su-row">
                     <Avatars emails={[d.to]} />
-                    <span className="su-who"><strong>{displayName(d.to)}</strong>{profiles.get(d.to)?.upi && d.currency === 'INR' ? <span className="muted small">UPI · {profiles.get(d.to)?.upi}</span> : null}</span>
+                    <span className="su-who">
+                      <strong>{displayName(d.to)}</strong>
+                      <ReminderNote r={reminderFor(d.to, me)} prefix="Reminded you" fallback={profiles.get(d.to)?.upi && d.currency === 'INR' ? `UPI · ${profiles.get(d.to)?.upi}` : ''} ask />
+                    </span>
                     <strong className="su-amt neg">{money(d.amount, d.currency)}</strong>
                     <button className="btn small pay" type="button" onClick={() => setPaying(d)}>Pay</button>
                   </li>
@@ -85,10 +104,13 @@ export function SettleUp({ entry, user, list, profiles }: { entry: TripEntry; us
                 {toMe.map((d) => (
                   <li key={`${d.currency}:${d.from}`} className="su-row">
                     <Avatars emails={[d.from]} />
-                    <span className="su-who"><strong>{displayName(d.from)}</strong></span>
+                    <span className="su-who">
+                      <strong>{displayName(d.from)}</strong>
+                      <ReminderNote r={reminderFor(me, d.from)} prefix="Reminded" />
+                    </span>
                     <strong className="su-amt pos">{money(d.amount, d.currency)}</strong>
                     <span className="su-acts">
-                      <button className="btn ghost small" type="button" onClick={() => remind(d)}>Remind</button>
+                      <button className="btn ghost small" type="button" onClick={() => setReminding(d)}>Remind</button>
                       <button className="btn ghost small" type="button" onClick={() => received(d)}>Received</button>
                     </span>
                   </li>
@@ -114,14 +136,91 @@ export function SettleUp({ entry, user, list, profiles }: { entry: TripEntry; us
         </>
       )}
       {toMe.some((d) => d.currency === 'INR') || myUpi ? <UpiCard tripId={entry.trip.id} user={user} current={myUpi} prompt={toMe.some((d) => d.currency === 'INR') && !myUpi} /> : null}
+      {remindingNow ? <RemindSheet entry={entry} user={user} debt={remindingNow} myUpi={myUpi} last={reminderFor(me, remindingNow.from)} onClose={() => setReminding(null)} /> : null}
       {payingNow ? <PaySheet entry={entry} user={user} debt={payingNow} payee={profiles.get(payingNow.to)} onClose={() => setPaying(null)} /> : null}
     </section>
   );
 }
 
+// "🔔 Reminded 2 h ago" under a name (or other small print when there's no reminder).
+function ReminderNote({ r, prefix, fallback = '', ask: incoming = false }: { r: Reminder | undefined; prefix: string; fallback?: string; ask?: boolean }) {
+  if (r) return <span className={`su-note${incoming ? ' ask' : ''}`}>🔔 {prefix} {ago(r.atMs)}</span>;
+  return fallback ? <span className="muted small">{fallback}</span> : null;
+}
+
+/* ---------- reminding someone ---------- */
+function RemindSheet({ entry, user, debt, myUpi, last, onClose }: {
+  entry: TripEntry; user: User; debt: Debt; myUpi: string; last: Reminder | undefined; onClose: () => void;
+}) {
+  const [sending, setSending] = useState(false);
+  const name = displayName(debt.from);
+  const amount = money(debt.amount, debt.currency);
+  const text = `Hi ${name}! A gentle reminder for our trip “${entry.trip.title}”: you owe me ${amount}.`
+    + (myUpi && debt.currency === 'INR' ? ` My UPI ID is ${myUpi}.` : '')
+    + ' You can pay me from the trip’s Expenses page in GoWander. Thanks!';
+  // One in-app reminder an hour is plenty.
+  const recent = !!last && Date.now() - last.atMs < 3600000;
+
+  const inApp = async () => {
+    setSending(true);
+    try {
+      await cloud.sendReminder(user, entry.trip.id, debt.from, debt.amount, debt.currency);
+      toast(`Reminder sent. ${name} will see it in GoWander.`, 'ok');
+      onClose();
+    } catch (e) { toast((e as Error).message, 'bad'); setSending(false); }
+  };
+  const share = async () => {
+    try { await navigator.share({ text }); } catch { /* closed the share sheet */ }
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); toast('Message copied. Paste it into any chat.', 'ok'); } catch { toast('Couldn’t copy. Select the message and copy it.', 'bad'); }
+  };
+
+  return (
+    <Sheet title={`Remind ${name}`} onClose={onClose} className="remind-sheet">
+      <div className="pay-head">
+        <Avatars emails={[debt.from]} />
+        <div><strong>{name}</strong><span className="muted small">owes you <strong className="su-amt pos">{amount}</strong></span></div>
+      </div>
+
+      <div className="rm-opt">
+        <div className="rm-row">
+          <span className="rm-ic" aria-hidden="true">🔔</span>
+          <div className="rm-body">
+            <strong>Remind in GoWander</strong>
+            <span className="muted small">{name} sees it on the trip and in Expenses, with a button to pay you.</span>
+            {last ? <span className="su-note">Last reminded {ago(last.atMs)}</span> : null}
+          </div>
+        </div>
+        <button className="btn" type="button" disabled={sending || recent} onClick={inApp}>
+          {sending ? 'Sending…' : recent ? 'Reminder sent ✓' : last ? 'Remind again' : 'Send reminder'}
+        </button>
+      </div>
+
+      <div className="rm-opt">
+        <div className="rm-row">
+          <span className="rm-ic" aria-hidden="true">💬</span>
+          <div className="rm-body">
+            <strong>Send a message</strong>
+            <span className="muted small">On WhatsApp or any other app.</span>
+          </div>
+        </div>
+        <blockquote className="rm-msg">{text}</blockquote>
+        <div className="rm-btns">
+          <a className="btn wa" href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener">WhatsApp</a>
+          {typeof navigator.share === 'function' ? <button className="btn ghost" type="button" onClick={share}>Other apps…</button> : null}
+          <button className="btn ghost" type="button" onClick={copy}>Copy</button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
 /* ---------- paying someone ---------- */
 function PaySheet({ entry, user, debt, payee, onClose }: { entry: TripEntry; user: User; debt: Debt; payee: Profile | undefined; onClose: () => void }) {
-  const [amount, setAmount] = useState(String(debt.amount));
+  // The full amount owed, following the live balance, until you type a different one.
+  const [typed, setAmount] = useState<string | null>(null);
+  const amount = typed ?? String(debt.amount);
   const [launched, setLaunched] = useState(false);
   const [back, setBack] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -149,6 +248,7 @@ function PaySheet({ entry, user, debt, payee, onClose }: { entry: TripEntry; use
     setSaving(true);
     try {
       await recordPayment(user, entry, debt, n);
+      if (n >= debt.amount - 0.01) quiet(cloud.clearReminder(entry.trip.id, debt.to, debt.from));
       toast(n < debt.amount ? `Recorded ${money(n, debt.currency)}. ${money(debt.amount - n, debt.currency)} left to pay ${name}.` : `Paid ${name} ${money(n, debt.currency)}. You're settled up.`, 'ok');
       onClose();
     } catch (e) { toast((e as Error).message, 'bad'); setSaving(false); }
@@ -247,3 +347,24 @@ function UpiCard({ tripId, user, current, prompt }: { tripId: string; user: User
   );
 }
 
+
+/* ---------- on the trip page: "Asha is reminding you to pay" ---------- */
+export function ReminderCard({ tripId, reminders, user }: { tripId: string; reminders: Reminder[]; user: User }) {
+  const forMe = reminders.filter((r) => r.to === user.email).sort((a, b) => b.atMs - a.atMs);
+  if (!forMe.length) return null;
+  return (
+    <section className="ed-card rm-card" aria-label="Payment reminders">
+      {forMe.map((r) => (
+        <div key={r.from} className="rm-item">
+          <span className="rm-bell" aria-hidden="true">🔔</span>
+          <span className="rm-text">
+            <span><strong>{displayName(r.from)}</strong> is reminding you to pay <strong>{money(r.amount, r.currency)}</strong></span>
+            <span className="muted small">{ago(r.atMs)}</span>
+          </span>
+          <Link className="btn small pay" to={`/expenses/${encodeURIComponent(tripId)}?pay=${encodeURIComponent(r.from)}`}>Pay</Link>
+          <button className="icon-btn" type="button" aria-label={`Dismiss ${displayName(r.from)}'s reminder`} title="Dismiss" onClick={() => quiet(cloud.clearReminder(tripId, r.from, r.to))}>✕</button>
+        </div>
+      ))}
+    </section>
+  );
+}

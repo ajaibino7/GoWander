@@ -203,6 +203,10 @@ button { font: inherit; color: inherit; }
   display: block; height: clamp(160px, 30vw, 250px); width: auto; max-width: 84vw; object-fit: contain;
   filter: drop-shadow(0 10px 18px rgba(19, 41, 75, .16));
   animation: rise .9s cubic-bezier(.2, .8, .2, 1) both;
+  /* A selected image gets the browser's selection tint over its whole box (grey when the window
+     isn't focused), which the drop shadow turns into a "card" behind the logo. It's artwork, not
+     text: never selectable, draggable or long-press-saveable. */
+  -webkit-user-select: none; user-select: none; -webkit-user-drag: none; -webkit-touch-callout: none;
 }
 /* The app's first header after index.html's static paint: the logo has already risen in. */
 .brand-logo.settled { animation: none; }

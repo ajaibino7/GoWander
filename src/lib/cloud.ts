@@ -7,7 +7,7 @@ import { firebaseConfig } from './firebase-config';
 import { normalizeTrip } from './store';
 import type {
   Budget, ChecklistItem, ChecklistList, DraftTrip, Expense, ExpenseCategory, ExpenseInput, Idea, JournalEntry, MemberLocation,
-  Place, Poll, PollOption, Profile, Review, Role, Trip, TripEntry, User,
+  Place, Poll, PollOption, Profile, Reminder, Review, Role, Trip, TripEntry, User,
 } from './types';
 
 // Local development against the Firebase emulators: add ?emulator on localhost.
@@ -540,6 +540,23 @@ export function watchProfiles(id: string, cb: (p: Map<string, Profile>) => void)
 export async function setMyProfile(user: User, id: string, fields: { upi?: string; nickname?: string }): Promise<void> {
   const { db, F } = await init();
   await commit(F.setDoc(F.doc(db, 'trips', id, 'profiles', user.email), { ...fields, updatedAt: F.serverTimestamp() }, { merge: true }));
+}
+
+/* ---------- settle-up reminders ---------- */
+const reminderId = (from: string, to: string) => `${from}__${to}`;
+export function watchReminders(id: string, cb: (r: Reminder[]) => void): Promise<Unsubscribe> {
+  return watchCollection(id, 'reminders', (docs) => cb(docs.map(([, d]): Reminder => ({
+    from: String(d.from || ''), to: String(d.to || ''), amount: Number(d.amount) || 0, currency: String(d.currency || 'INR'), atMs: toMs(d.createdAt),
+  })).filter((r) => r.from && r.to && r.amount > 0)));
+}
+// Reminding the same person again replaces the last reminder (one per pair).
+export async function sendReminder(user: User, id: string, to: string, amount: number, currency: string): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.setDoc(F.doc(db, 'trips', id, 'reminders', reminderId(user.email, to)), { from: user.email, to, amount, currency, createdAt: F.serverTimestamp() }));
+}
+export async function clearReminder(id: string, from: string, to: string): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.deleteDoc(F.doc(db, 'trips', id, 'reminders', reminderId(from, to))));
 }
 
 /* ---------- where's everyone ---------- */
