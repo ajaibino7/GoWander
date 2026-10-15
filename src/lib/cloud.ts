@@ -534,11 +534,12 @@ export async function setBudget(user: User, id: string, b: Budget | null): Promi
   await commit(b ? F.setDoc(ref, { ...b, updatedBy: user.email, updatedAt: F.serverTimestamp() }) : F.deleteDoc(ref));
 }
 export function watchProfiles(id: string, cb: (p: Map<string, Profile>) => void): Promise<Unsubscribe> {
-  return watchCollection(id, 'profiles', (docs) => cb(new Map(docs.map(([email, d]) => [email, { email, upi: String(d.upi || '') }]))));
+  return watchCollection(id, 'profiles', (docs) => cb(new Map(docs.map(([email, d]) => [email, { email, upi: String(d.upi || ''), nickname: String(d.nickname || '') }]))));
 }
-export async function setMyUpi(user: User, id: string, upi: string): Promise<void> {
+// Merged, so saving your nickname keeps your UPI ID and the other way round.
+export async function setMyProfile(user: User, id: string, fields: { upi?: string; nickname?: string }): Promise<void> {
   const { db, F } = await init();
-  await commit(F.setDoc(F.doc(db, 'trips', id, 'profiles', user.email), { upi, updatedAt: F.serverTimestamp() }));
+  await commit(F.setDoc(F.doc(db, 'trips', id, 'profiles', user.email), { ...fields, updatedAt: F.serverTimestamp() }, { merge: true }));
 }
 
 /* ---------- where's everyone ---------- */

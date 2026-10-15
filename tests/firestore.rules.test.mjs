@@ -424,6 +424,16 @@ test('members set only their own UPI ID, and it must look like one', async () =>
   await assertFails(setDoc(prof(FRIEND, FRIEND.email), { upi: 'not a upi id', updatedAt: serverTimestamp() }));
   await assertFails(getDoc(prof(STRANGER, FRIEND.email)));
 });
+test('members set only their own nickname, and keep it short', async () => {
+  await addFriend();
+  const prof = (u, email) => doc(db(u), 'trips', 't1', 'profiles', email);
+  await assertSucceeds(setDoc(prof(FRIEND, FRIEND.email), { nickname: 'Fizz', updatedAt: serverTimestamp() }));
+  await assertSucceeds(setDoc(prof(FRIEND, FRIEND.email), { nickname: 'Fizz', upi: 'friend@okicici', updatedAt: serverTimestamp() }));
+  await assertSucceeds(getDoc(prof(OWNER, FRIEND.email)));
+  await assertFails(setDoc(prof(OWNER, FRIEND.email), { nickname: 'Not you', updatedAt: serverTimestamp() }));
+  await assertFails(setDoc(prof(FRIEND, FRIEND.email), { nickname: 'x'.repeat(31), updatedAt: serverTimestamp() }));
+  await assertFails(setDoc(prof(FRIEND, FRIEND.email), { nickname: 7, updatedAt: serverTimestamp() }));
+});
 test('members share only their own location, and can stop', async () => {
   await addFriend();
   const loc = (u, email) => doc(db(u), 'trips', 't1', 'locations', email);

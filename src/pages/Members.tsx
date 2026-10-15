@@ -5,8 +5,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAppData } from '../app/AppData';
 import { useReveal } from '../app/motion';
 import { useTripWatch } from '../app/useTripWatch';
+import { useTripProfiles } from '../app/names';
 import { shareCopy, shareOrCopy } from '../app/actions';
 import { BackLink } from '../components/Hero';
+import { NicknameCard } from '../components/NicknameCard';
 import { Page, PageLoading } from '../components/Page';
 import * as cloud from '../lib/cloud';
 import { ask, toast } from '../lib/toast';
@@ -31,6 +33,7 @@ export function MembersPage() {
   const { user, authReady } = useAppData();
   const navigate = useNavigate();
   const { entry, denied, retry } = useTripWatch(id, user);
+  const profiles = useTripProfiles(user ? id : null);
   const [busy, setBusy] = useState<string | null>(null); // which control is saving
   const [email, setEmail] = useState('');
   const [newRole, setNewRole] = useState<Role>('edit');
@@ -71,6 +74,7 @@ export function MembersPage() {
       foot="Only members can open this trip. Access is enforced by Firebase security rules."
     >
       <div ref={ref} style={{ display: 'contents' }}>
+        <NicknameCard tripId={trip.id} user={user} current={profiles.get(user.email)?.nickname || ''} />
         <section className="ed-card">
           <h2 className="sec-h">Invite people</h2>
           {owner ? (
@@ -120,8 +124,12 @@ export function MembersPage() {
               const viewer = meta.viewerEmails.includes(m);
               return (
                 <li key={m}>
-                  <span className="avatar">{(m[0] || '?').toUpperCase()}</span>
-                  <span className="m-email">{m}{m === user.email ? <> <span className="muted">(you)</span></> : null}</span>
+                  <span className="avatar">{((profiles.get(m)?.nickname || m)[0] || '?').toUpperCase()}</span>
+                  <span className="m-email">
+                    {profiles.get(m)?.nickname ? <strong className="m-nick">{profiles.get(m)?.nickname}</strong> : null}
+                    <span className={profiles.get(m)?.nickname ? 'muted small' : ''}>{m}</span>
+                    {m === user.email ? <> <span className="muted">(you)</span></> : null}
+                  </span>
                   {m === meta.ownerEmail ? <span className="badge pub">Owner</span>
                     : owner ? <RoleSelect value={viewer ? 'view' : 'edit'} label={`Access for ${m}`} disabled={busy === `role:${m}`} onChange={(r) => setRole(m, r)} />
                     : <span className={`badge ${viewer ? 'view' : 'local'}`}>{viewer ? 'View only' : 'Can edit'}</span>}

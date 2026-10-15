@@ -9,6 +9,7 @@ import type { User } from '../../lib/types';
 import { distM, fmtDist } from '../../lib/util';
 import { Avatars } from '../../components/Icons';
 import { mapFocusMember, setGroupSelf } from './TripMap';
+import { displayName } from '../../app/names';
 
 const shareKey = (tripId: string) => `gw-share-${tripId}`;
 const sharingUntil = (tripId: string): number => { try { return Number(localStorage.getItem(shareKey(tripId))) || 0; } catch { return 0; } };
@@ -101,7 +102,7 @@ export function GroupPanel({ tripId, user, members, endOfDay }: { tripId: string
               <li key={g.email}>
                 <button type="button" className="gp-person" onClick={() => mapFocusMember(g.email)}>
                   <Avatars emails={[g.email]} />
-                  <span className="gp-name">{g.email.split('@')[0]}</span>
+                  <span className="gp-name">{displayName(g.email)}</span>
                   <span className="muted small">{live.pos ? `${fmtDist(distM(live.pos, g))} away · ` : ''}{ago < 1 ? 'just now' : `${ago} min ago`}</span>
                 </button>
               </li>

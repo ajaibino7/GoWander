@@ -1,5 +1,6 @@
 // Small line icons (inherit the text colour).
 import type { ReactNode } from 'react';
+import { displayName, useNames } from '../app/names';
 
 function Svg({ children }: { children: ReactNode }) {
   return (
@@ -46,11 +47,12 @@ const AVATAR_COLORS = ['#1f6f8b', '#e8704f', '#3c8d6b', '#b8801c', '#6a4fb3', '#
 export const avatarColor = (e: string): string => AVATAR_COLORS[[...e].reduce((h, c) => h + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
 
 export function Avatars({ emails }: { emails: string[] }) {
+  useNames();
   if (!emails.length) return null;
   return (
     <span className="avatars">
       {emails.slice(0, 4).map((e) => (
-        <span key={e} className="av" style={{ background: avatarColor(e) }} title={e}>{(e[0] || '?').toUpperCase()}</span>
+        <span key={e} className="av" style={{ background: avatarColor(e) }} title={displayName(e) === e.split('@')[0] ? e : `${displayName(e)} · ${e}`}>{(displayName(e)[0] || '?').toUpperCase()}</span>
       ))}
       {emails.length > 4 ? <span className="av more">+{emails.length - 4}</span> : null}
     </span>

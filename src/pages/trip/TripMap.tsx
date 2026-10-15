@@ -7,6 +7,7 @@ import { emit, live, stopState, now, useLive, type LiveStop, type NearbyState } 
 import { intentFor } from '../../lib/nearby';
 import { esc, directionsUrl, fmtDist, fmtHHMM, prefersReducedMotion, THEME_COLORS } from '../../lib/util';
 import { avatarColor } from '../../components/Icons';
+import { displayName } from '../../app/names';
 
 // Leaflet arrives with the map (see TripMap); everything below runs only once the map exists.
 let L!: typeof import('leaflet');
@@ -85,13 +86,13 @@ const STALE = 15 * 60000;
 function renderGroup(map: LMap): void {
   if (!groupLayer) return;
   const people = live.groupOn ? live.group.filter((g) => g.email !== groupSelf) : [];
-  const sig = people.map((g) => `${g.email}:${g.lat},${g.lng}:${Date.now() - g.atMs > STALE}`).join('|');
+  const sig = people.map((g) => `${g.email}:${displayName(g.email)}:${g.lat},${g.lng}:${Date.now() - g.atMs > STALE}`).join('|');
   if (sig !== lastGroupSig) {
     lastGroupSig = sig;
     groupLayer.clearLayers();
     for (const g of people) {
       const stale = Date.now() - g.atMs > STALE;
-      const name = g.email.split('@')[0] || g.email;
+      const name = displayName(g.email);
       const icon = L.divIcon({ className: '', html: `<div class="grp-marker${stale ? ' stale' : ''}" style="background:${avatarColor(g.email)}">${esc((name[0] || '?').toUpperCase())}</div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
       const ago = Math.round((Date.now() - g.atMs) / 60000);
       L.marker([g.lat, g.lng], { icon, zIndexOffset: 900 }).bindPopup(`<strong>${esc(name)}</strong><br>${ago < 1 ? 'Just now' : `${ago} min ago`}<div class="pop-actions"><a href="${directionsUrl(g)}" target="_blank" rel="noopener">Directions</a></div>`).addTo(groupLayer);

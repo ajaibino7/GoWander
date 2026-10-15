@@ -1,11 +1,13 @@
 // #/expenses/:id — shared money for the trip, in three tabs:
 //   Overview: totals, the budget (estimated vs actual, per day), where the money went (by
-//     category and by person), and settling up — with a one-tap UPI payment.
+//     category and by person), and settling up: what's still owed, person to person, with a
+//     Pay button that opens your UPI app with the person and amount filled in.
 //   Add: what, how much, category, who paid, split equally or by amount, and a bill photo.
 //   All: every expense and settlement, with the bill photo a tap away.
 import { useEffect, useRef, useState } from 'react';
 import { TripSubPage, type TripCtx } from '../app/TripSubPage';
 import { useLeaving, useNewItems, useReveal } from '../app/motion';
+import { useProfiles } from '../app/names';
 import { nameOf } from '../app/useTripWatch';
 import { Bars, Donut } from '../components/Charts';
 import { Avatars, Icon, avatarColor } from '../components/Icons';
@@ -13,13 +15,13 @@ import { Sheet } from '../components/Sheet';
 import * as cloud from '../lib/cloud';
 import { compressPhoto } from '../lib/editing';
 import {
-  CATEGORY_INFO, CATEGORY_KEYS, CURRENCIES, balances, categoryOf, guessCategory, isUpiId, money, myShare, rememberCurrency, round2,
-  settlements, spendByCategory, spendByDay, spendByPerson, tripCurrency, upiLink, type Settlement,
+  CATEGORY_INFO, CATEGORY_KEYS, CURRENCIES, balances, categoryOf, guessCategory, money, myShare, rememberCurrency, round2,
+  spendByCategory, spendByDay, spendByPerson, tripCurrency,
 } from '../lib/expenses';
 import { ask, toast } from '../lib/toast';
 import { dayMonth, fmtRange, makeClock } from '../lib/util';
 import type { Budget, Expense, ExpenseCategory, ExpenseInput, Profile, TripEntry, User } from '../lib/types';
-import qrcode from 'qrcode-generator';
+import { SettleUp } from './SettleUp';
 
 type Tab = 'overview' | 'add' | 'all';
 interface FormState {
@@ -43,7 +45,7 @@ function ExpensesBody({ ctx, entry, user }: { ctx: TripCtx; entry: TripEntry; us
   const id = ctx.id;
   const [expenses, setExpenses] = useState<Expense[] | null>(null);
   const [budget, setBudgetState] = useState<Budget | null | undefined>(undefined);
-  const [profiles, setProfiles] = useState<Map<string, Profile>>(new Map());
+  const profiles = useProfiles();
   const [tab, setTabState] = useState<Tab>(lastTab);
   const setTab = (t: Tab) => { lastTab = t; setTabState(t); window.scrollTo({ top: 0, behavior: 'smooth' }); };
   const [editing, setEditing] = useState<string | null>(null);
@@ -56,7 +58,6 @@ function ExpensesBody({ ctx, entry, user }: { ctx: TripCtx; entry: TripEntry; us
     const keep = (u: () => void) => { if (gone) u(); else offs.push(u); };
     cloud.watchExpenses(id, setExpenses, (e) => toast(e, 'bad')).then(keep);
     cloud.watchBudget(id, setBudgetState).then(keep);
-    cloud.watchProfiles(id, setProfiles).then(keep);
     return () => { gone = true; offs.forEach((u) => u()); };
   }, [id]);
 
@@ -129,9 +130,9 @@ function ExpensesBody({ ctx, entry, user }: { ctx: TripCtx; entry: TripEntry; us
                 <li key={x.id} className={`ex-row${x.kind === 'settlement' ? ' settle' : ''}${isNew(x.id) ? ' fresh' : ''}${leaving.has(x.id) ? ' leaving' : ''}`}>
                   <span className="ex-ic" aria-hidden="true" style={x.kind === 'settlement' ? undefined : { background: `color-mix(in srgb, ${cat.color} 16%, var(--surface))` }}>{x.kind === 'settlement' ? '🤝' : cat.icon}</span>
                   <span className="ex-main">
-                    <span className="ex-title">{x.title}</span>
+                    <span className="ex-title">{x.kind === 'settlement' ? `${who(x.paidBy)} paid ${who(x.split[0] || '')}` : x.title}</span>
                     <span className="ex-meta">{fmtRange(x.date, x.date)} · {x.kind === 'settlement'
-                      ? `${who(x.paidBy)} paid ${who(x.split[0] || '')}`
+                      ? 'Settle-up payment'
                       : `Paid by ${who(x.paidBy)} · ${x.shares ? 'split by amount' : x.split.length === members.length ? 'split with everyone' : `split ${x.split.length} way${x.split.length === 1 ? '' : 's'}`}`}</span>
                   </span>
                   <span className="ex-amtv">{money(x.amount, x.currency)}</span>
@@ -160,34 +161,12 @@ function Overview({ ctx, entry, user, list, budget, profiles, who, onAdd }: {
 }) {
   const by = balances(list);
   const me = user.email;
-  const moves = [...by].flatMap(([cur, c]) => settlements(c.bal).map((m) => ({ ...m, cur })));
-  const [qr, setQr] = useState<{ link: string; to: string; amount: string } | null>(null);
-  const today = makeClock(entry.trip.timezone).dateKey(new Date());
   // The main currency: the budget's, else whichever was used most.
   const curs = [...by.keys()];
   const main = budget?.currency || [...curs].sort((a, b) => (by.get(b)?.spent || 0) - (by.get(a)?.spent || 0))[0] || tripCurrency(entry.trip);
   const fmt = (n: number) => money(round2(n), main);
   const cats = spendByCategory(list, main);
   const people = spendByPerson(list, main);
-  const owedToMe = moves.some((m) => m.to === me && m.cur === 'INR');
-  const myUpi = profiles.get(me)?.upi || '';
-
-  const markPaid = async (m: Settlement & { cur: string }) => {
-    if (!(await ask(`${who(m.from)} paid ${who(m.to)} ${money(m.amount, m.cur)}?`, { detail: 'This records the payment and updates everyone\'s balance.', ok: 'Mark paid' }))) return;
-    try {
-      await cloud.saveExpense(user, ctx.id, {
-        title: `${m.from.split('@')[0]} paid back ${m.to.split('@')[0]}`,
-        amount: m.amount, currency: m.cur, paidBy: m.from, split: [m.to], date: today, kind: 'settlement',
-      });
-      toast('Payment recorded', 'ok');
-    } catch (err) { toast((err as Error).message, 'bad'); }
-  };
-  const payUpi = (m: Settlement & { cur: string }, vpa: string) => {
-    const link = upiLink({ vpa, name: m.to.split('@')[0] || 'GoWander', amount: m.amount, note: `${entry.trip.title} · GoWander` });
-    // Phones open the UPI app; on a computer, show a QR code to scan with the phone.
-    if (matchMedia('(pointer: coarse)').matches) location.href = link;
-    else setQr({ link, to: who(m.to), amount: money(m.amount, m.cur) });
-  };
 
   if (!list.length) {
     return (
@@ -195,7 +174,7 @@ function Overview({ ctx, entry, user, list, budget, profiles, who, onAdd }: {
         <section className="ed-card empty-card ov-card">
           <div className="empty-art" aria-hidden="true">🧾</div>
           <strong>No expenses yet</strong>
-          <p className="fine">Log what each person pays. GoWander works out who owes whom, with the fewest payments, and you can settle up with UPI.</p>
+          <p className="fine">Log what each person pays. GoWander keeps track of who owes whom, and you can pay each other back with UPI in a tap.</p>
           <div><button className="btn" type="button" onClick={onAdd}><Icon.plus /> Add the first expense</button></div>
         </section>
         <BudgetCard ctx={ctx} entry={entry} user={user} budget={budget} list={list} />
@@ -223,30 +202,7 @@ function Overview({ ctx, entry, user, list, budget, profiles, who, onAdd }: {
 
       <BudgetCard ctx={ctx} entry={entry} user={user} budget={budget} list={list} />
 
-      {moves.length ? (
-        <section className="ed-card ov-card">
-          <h2 className="sec-h">Settle up</h2>
-          <p className="fine">The fewest payments that square everyone up.</p>
-          <ul className="ex-moves">
-            {moves.map((m, i) => {
-              const vpa = profiles.get(m.to)?.upi || '';
-              const canUpi = m.from === me && m.cur === 'INR';
-              return (
-                <li key={`${m.cur}:${m.from}:${m.to}:${i}`}>
-                  <span><Avatars emails={[m.from]} /> <strong>{who(m.from)}</strong> pays <strong>{who(m.to)}</strong> <Avatars emails={[m.to]} /></span>
-                  <span className="ex-move-r">
-                    <strong>{money(m.amount, m.cur)}</strong>
-                    {canUpi && vpa ? <button className="btn small upi" type="button" onClick={() => payUpi(m, vpa)}>Pay via UPI</button> : null}
-                    <button className="btn ghost small" type="button" onClick={() => markPaid(m)}>Mark paid</button>
-                  </span>
-                  {canUpi && !vpa ? <span className="ex-hint">Ask {who(m.to)} to add their UPI ID here, and you can pay in one tap.</span> : null}
-                </li>
-              );
-            })}
-          </ul>
-          {owedToMe || myUpi ? <UpiCard tripId={ctx.id} user={user} current={myUpi} prompt={owedToMe && !myUpi} /> : null}
-        </section>
-      ) : null}
+      <SettleUp entry={entry} user={user} list={list} profiles={profiles} />
 
       {cats.length ? (
         <section className="ed-card ov-card">
@@ -266,7 +222,6 @@ function Overview({ ctx, entry, user, list, budget, profiles, who, onAdd }: {
         </section>
       ) : null}
 
-      {qr ? <QrSheet {...qr} onClose={() => setQr(null)} /> : null}
     </>
   );
 }
@@ -369,52 +324,6 @@ function dayBars(dates: string[], byDay: Map<string, number>) {
     ...dates.map((d, i) => ({ key: d, label: <>Day {i + 1} <span className="muted small">{dayMonth(d)}</span></>, value: byDay.get(d) || 0 })),
     ...(after ? [{ key: 'after', label: <span className="muted">After</span>, value: after, color: 'var(--t-slate)' }] : []),
   ];
-}
-
-/* ---------- UPI ---------- */
-function UpiCard({ tripId, user, current, prompt }: { tripId: string; user: User; current: string; prompt: boolean }) {
-  const [edit, setEdit] = useState(prompt);
-  const [vpa, setVpa] = useState(current);
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const v = vpa.trim();
-    if (v && !isUpiId(v)) { toast('A UPI ID looks like name@bank, e.g. ravi@okicici.', 'bad'); return; }
-    setEdit(false);
-    try { await cloud.setMyUpi(user, tripId, v); toast(v ? 'UPI ID saved. Friends can now pay you in one tap.' : 'UPI ID removed', 'ok'); } catch (err) { toast((err as Error).message, 'bad'); }
-  };
-  if (!edit) {
-    return (
-      <div className="upi-me">
-        <span>💳 Your UPI ID: <strong>{current}</strong></span>
-        <button className="link-btn" type="button" onClick={() => { setVpa(current); setEdit(true); }}>Change</button>
-      </div>
-    );
-  }
-  return (
-    <form className="upi-form" noValidate onSubmit={save}>
-      <label className="fld"><span>💳 Your UPI ID, so friends can pay you in one tap</span>
-        <input inputMode="email" autoCapitalize="off" spellCheck={false} placeholder="yourname@okicici" value={vpa} onChange={(e) => setVpa(e.target.value)} />
-      </label>
-      <div className="form-acts">
-        {current ? <button className="btn ghost" type="button" onClick={() => setEdit(false)}>Cancel</button> : null}
-        <button className="btn" type="submit">Save</button>
-      </div>
-    </form>
-  );
-}
-
-function QrSheet({ link, to, amount, onClose }: { link: string; to: string; amount: string; onClose: () => void }) {
-  const qr = qrcode(0, 'M');
-  qr.addData(link);
-  qr.make();
-  return (
-    <Sheet title={`Pay ${to} ${amount}`} onClose={onClose}>
-      <p className="fine">Scan with any UPI app on your phone (GPay, PhonePe, Paytm…). The amount is filled in.</p>
-      {/* A generated SVG of the payment link (no outside content). */}
-      <div className="qr" dangerouslySetInnerHTML={{ __html: qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true }) }} />
-      <p className="fine">After paying, tap <strong>Mark paid</strong> so everyone's balance updates.</p>
-    </Sheet>
-  );
 }
 
 /* ============================================================

@@ -248,15 +248,18 @@ service cloud.firestore {
         allow delete: if canEdit(trip());
       }
 
-      // Each member's own details for the group (their UPI ID for settling up). Document id =
-      // their email; only they write it.
+      // Each member's own details for the group: their nickname (shown instead of their email)
+      // and their UPI ID for settling up. Document id = their email; only they write it.
       match /profiles/{email} {
         function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        function upi(d) { return d.get('upi', ''); }
+        function nickname(d) { return d.get('nickname', ''); }
         allow read: if isMember(trip());
         allow create, update: if isMember(trip()) && email == myEmail()
-          && request.resource.data.keys().hasOnly(['upi', 'updatedAt'])
-          && request.resource.data.upi is string && request.resource.data.upi.size() <= 60
-          && (request.resource.data.upi == '' || request.resource.data.upi.matches('[A-Za-z0-9._-]+@[A-Za-z0-9.-]+'))
+          && request.resource.data.keys().hasOnly(['upi', 'nickname', 'updatedAt'])
+          && upi(request.resource.data) is string && upi(request.resource.data).size() <= 60
+          && (upi(request.resource.data) == '' || upi(request.resource.data).matches('[A-Za-z0-9._-]+@[A-Za-z0-9.-]+'))
+          && nickname(request.resource.data) is string && nickname(request.resource.data).size() <= 30
           && request.resource.data.updatedAt == request.time;
         allow delete: if email == myEmail() || isOwner(trip());
       }

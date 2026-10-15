@@ -11,6 +11,7 @@ import {
 import { mapFocusStop } from './TripMap';
 import { DayTips } from './DayTips';
 import { BookingCard } from '../../components/BookingCard';
+import { displayName } from '../../app/names';
 
 export function DayTabs({ phase }: { phase: Phase }) {
   const todayN = 'day' in phase ? phase.day.n : undefined;
@@ -163,7 +164,7 @@ export function DayView({ phase, onNearby, review }: { phase: Phase; onNearby: (
                   <span>📍 {s.place.name}{s.place.approx ? ' (approx.)' : ''}</span>
                   {live.pos ? <span>{fmtDist(distM(live.pos, s.place))} away</span> : null}
                   <StopWeather day={day} s={s} />
-                  {doneBy ? <span className="done-by">✓ {doneBy.split('@')[0]}</span> : null}
+                  {doneBy ? <span className="done-by">✓ {displayName(doneBy)}</span> : null}
                 </div>
                 <Leg day={day} s={s} />
                 {selected ? (
@@ -195,6 +196,6 @@ function ReviewTally({ stopId }: { stopId: string }) {
   const rs = live.reviews.filter((r) => r.stopId === stopId);
   if (!rs.length) return null;
   const up = rs.filter((r) => r.vote === 1).length, down = rs.length - up;
-  const notes = rs.filter((r) => r.note).map((r) => `${r.vote === 1 ? '👍' : '👎'} ${r.email.split('@')[0]}: ${r.note}`).join('\n');
+  const notes = rs.filter((r) => r.note).map((r) => `${r.vote === 1 ? '👍' : '👎'} ${displayName(r.email)}: ${r.note}`).join('\n');
   return <span className={`tag review${up >= down ? ' up' : ' down'}`} title={notes || undefined}>{up ? `👍 ${up}` : ''}{up && down ? ' · ' : ''}{down ? `👎 ${down}` : ''}</span>;
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dayMessage, nextSlot, packingFor, planAgain, recapOf, shiftDates, shiftRemaining, withStop } from './plan';
-import { balances, guessCategory, myShare, parts, settlements, spendByCategory, upiLink, isUpiId } from './expenses';
+import { balances, guessCategory, myShare, pairwiseDebts, parts, settlements, spendByCategory, upiLink, isUpiId } from './expenses';
 import { normalizeBooking, normalizeTrip } from './store';
 import { emergencyFor, telOf } from './sos';
 import type { Expense, Stop, Trip } from './types';
@@ -129,6 +129,23 @@ describe('expenses: split by amount, categories, UPI', () => {
     expect(settlements(bal)).toEqual([{ from: 'b', to: 'a', amount: 400 }]);
     expect(myShare([e], 'c', 'INR')).toBe(0);
   });
+  it('nets what each pair owes, minus what was paid back', () => {
+    const list = [
+      x({ paidBy: 'a', amount: 900, split: ['a', 'b', 'c'] }), // b and c each owe a 300
+      x({ paidBy: 'b', amount: 200, split: ['a', 'b'] }), // a owes b 100
+      x({ paidBy: 'c', amount: 300, split: ['b', 'c'], shares: { b: 300 } }), // b owes c 300
+    ];
+    // a↔b: b owes 300, a owes 100 → b owes a 200. c owes a 300. b owes c 300.
+    const key = (d: { from: string; to: string; amount: number }) => `${d.from}>${d.to}:${d.amount}`;
+    expect(pairwiseDebts(list).map(key).sort()).toEqual(['b>a:200', 'b>c:300', 'c>a:300']);
+    // b pays a back 150: 50 left. c pays a 300 in full: gone. Overpaying flips the debt.
+    const paid = [...list, x({ kind: 'settlement', paidBy: 'b', split: ['a'], amount: 150 }), x({ kind: 'settlement', paidBy: 'c', split: ['a'], amount: 300 })];
+    expect(pairwiseDebts(paid).map(key).sort()).toEqual(['b>a:50', 'b>c:300']);
+    expect(pairwiseDebts([...paid, x({ kind: 'settlement', paidBy: 'b', split: ['a'], amount: 80 })]).map(key).sort()).toEqual(['a>b:30', 'b>c:300']);
+    // Different currencies never mix.
+    expect(pairwiseDebts([x({ paidBy: 'a', amount: 100, split: ['b'] }), x({ paidBy: 'b', amount: 50, split: ['a'], currency: 'USD' })]).map((d) => `${d.from}>${d.to}:${d.amount}${d.currency}`).sort())
+      .toEqual(['a>b:50USD', 'b>a:100INR']);
+  });
   it('guesses categories and sums spending by category', () => {
     expect(guessCategory('Taxi to CSMT')).toBe('travel');
     expect(guessCategory('Fish thali')).toBe('food');
@@ -138,7 +155,7 @@ describe('expenses: split by amount, categories, UPI', () => {
     expect(spendByCategory([x({}), x({ title: 'Cab', amount: 300 }), x({ title: 'Lunch', amount: 100, category: 'food' })], 'INR')).toEqual([['food', 1000], ['travel', 300]]);
   });
   it('builds UPI links and checks UPI IDs', () => {
-    expect(upiLink({ vpa: 'ravi@okicici', name: 'Ravi', amount: 350, note: 'Goa trip' })).toBe('upi://pay?pa=ravi%40okicici&pn=Ravi&am=350.00&cu=INR&tn=Goa%20trip');
+    expect(upiLink({ vpa: 'ravi@okicici', name: 'Ravi', amount: 350, note: 'Goa trip' })).toBe('upi://pay?pa=ravi@okicici&pn=Ravi&am=350.00&cu=INR&tn=Goa%20trip');
     expect(isUpiId('ravi.k@okicici')).toBe(true);
     expect(isUpiId('not a upi')).toBe(false);
   });

@@ -5,6 +5,7 @@ import { useParams } from 'react-router-dom';
 import { useAppData } from '../app/AppData';
 import { useLeaving, useNewItems, useReveal } from '../app/motion';
 import { nameOf, useTripWatch } from '../app/useTripWatch';
+import { useTripProfiles } from '../app/names';
 import { BackLink } from '../components/Hero';
 import { Page, PageLoading } from '../components/Page';
 import * as cloud from '../lib/cloud';
@@ -29,6 +30,7 @@ export function ChecklistPage() {
   const { id = '' } = useParams();
   const { user, authReady } = useAppData();
   const { entry, denied, retry } = useTripWatch(id, user);
+  useTripProfiles(user ? id : null);
   const [items, setItems] = useState<ChecklistItem[] | null>(null);
   // Items ticked just now get a little "pop" (the list redraws on every change).
   const [justTicked, setJustTicked] = useState<string | null>(null);

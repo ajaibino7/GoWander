@@ -162,8 +162,8 @@ export interface Poll {
 /** Trip budget, per person, in one currency. */
 export interface Budget { perPerson: number; currency: string }
 
-/** A member's details for the group: their UPI ID for settling up. */
-export interface Profile { email: string; upi: string }
+/** A member's details for the group: their nickname (shown instead of their email) and UPI ID. */
+export interface Profile { email: string; upi: string; nickname: string }
 
 /** Where a member is right now, if they chose to share it. */
 export interface MemberLocation {

@@ -80,6 +80,44 @@ export function settlements(bal: Map<string, number>): Settlement[] {
   return out;
 }
 
+export interface Debt { from: string; to: string; amount: number; currency: string }
+
+/**
+ * What each person still owes each other person, after netting both ways and taking off what's
+ * already been paid back. For every expense, each person in the split owes the payer their part;
+ * a settlement ("Asha paid Ravi ₹200") pays that down. "You owe Asha ₹300, she owes you ₹100"
+ * becomes one debt: you owe Asha ₹200.
+ */
+export function pairwiseDebts(expenses: Pick<ExpenseInput, 'amount' | 'currency' | 'paidBy' | 'split' | 'kind' | 'shares'>[]): Debt[] {
+  const owe = new Map<string, number>(); // "currency|from|to" → amount
+  const add = (cur: string, from: string, to: string, v: number) => {
+    if (from === to || !v) return;
+    const k = `${cur}|${from}|${to}`;
+    owe.set(k, (owe.get(k) || 0) + v);
+  };
+  for (const x of expenses) {
+    if (x.kind === 'settlement') {
+      // The payer handed money to split[0]: that's the same as split[0] now owing it back.
+      const to = x.split[0];
+      if (to) add(x.currency, to, x.paidBy, x.amount);
+    } else {
+      for (const [p, v] of parts(x)) add(x.currency, p, x.paidBy, v);
+    }
+  }
+  const out: Debt[] = [];
+  const seen = new Set<string>();
+  for (const k of owe.keys()) {
+    const [cur = '', a = '', b = ''] = k.split('|');
+    const pair = `${cur}|${[a, b].sort().join('|')}`;
+    if (seen.has(pair)) continue;
+    seen.add(pair);
+    const net = round2((owe.get(`${cur}|${a}|${b}`) || 0) - (owe.get(`${cur}|${b}|${a}`) || 0));
+    if (net >= 0.01) out.push({ from: a, to: b, amount: net, currency: cur });
+    else if (net <= -0.01) out.push({ from: b, to: a, amount: -net, currency: cur });
+  }
+  return out.sort((x, y) => y.amount - x.amount);
+}
+
 /** Your share of real spending in a currency. */
 export function myShare(expenses: Expense[], me: string, cur: string): number {
   return expenses
@@ -138,5 +176,6 @@ export const isUpiId = (s: string): boolean => /^[A-Za-z0-9._-]{2,}@[A-Za-z0-9.-
 /** A UPI payment link: opens GPay, PhonePe, Paytm… with the amount filled in (INR only). */
 export function upiLink({ vpa, name, amount, note }: { vpa: string; name: string; amount: number; note: string }): string {
   const q = new URLSearchParams({ pa: vpa.trim(), pn: name, am: amount.toFixed(2), cu: 'INR', tn: note.slice(0, 50) });
-  return `upi://pay?${q.toString().replace(/\+/g, '%20')}`;
+  // Spaces as %20, and the UPI ID's "@" kept as is (some UPI apps don't decode %40 in it).
+  return `upi://pay?${q.toString().replace(/\+/g, '%20').replace(/^pa=([^&]*)%40/, 'pa=$1@')}`;
 }

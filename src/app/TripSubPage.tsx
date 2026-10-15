@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAppData } from './AppData';
 import { useTripWatch } from './useTripWatch';
+import { useTripProfiles } from './names';
 import { BackLink } from '../components/Hero';
 import { Page, PageLoading } from '../components/Page';
 import { canEditTrip } from '../lib/tripStatus';
@@ -42,6 +43,8 @@ export function TripSubPage({ viewId, eyebrow, foot, allowSample = false, sub, a
   const { user, authReady, samples, samplesReady, myTrips, cached } = useAppData();
   const sample = allowSample ? samples.find((t) => t.id === id) : undefined;
   const { entry, denied, retry } = useTripWatch(sample ? '' : id, sample ? null : user);
+  // Members' nicknames (and UPI IDs) for everything on the screen.
+  useTripProfiles(!sample && user ? id : null);
   const back = <BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />;
   const loading = <PageLoading viewId={viewId} eyebrow={eyebrow} back={back} tripId={id} />;
 
