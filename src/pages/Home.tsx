@@ -1,4 +1,5 @@
 // Home: the logo header, your trips (live first), the sample trip, and sign-in when signed out.
+import { HomeToday } from './HomeToday';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAppData } from '../app/AppData';
@@ -127,7 +128,6 @@ export function HomePage({ message = '' }: { message?: string }) {
           <span className="hp-v">{focus.trip.title}{focus.st.key === 'soon' ? ` · ${focus.st.label.toLowerCase()}` : ''}</span><span aria-hidden="true">→</span>
         </Link>
       ) : null}
-      {me ? <div className="hero-who">Signed in as {me.email}</div> : null}
     </>
   );
 
@@ -143,6 +143,7 @@ export function HomePage({ message = '' }: { message?: string }) {
   } else {
     body = (
       <>
+        <HomeToday user={me} rows={rows} />
         <div className="home-head">
           <div>
             <h2 className="list-h">Your trips</h2>
@@ -203,7 +204,7 @@ export function HomePage({ message = '' }: { message?: string }) {
     <Page
       viewId="view-home"
       hero={{ logo: true, desc: 'Plan together · Travel smarter · Follow it live', sub, nav: <><span /><AccountChip /></> }}
-      foot={cloud.emulatorMode ? 'Using local Firebase emulators.' : 'Trips are private to their members. Your location never leaves your device.'}
+      foot={cloud.emulatorMode ? 'Using local Firebase emulators.' : 'Trips are private to their members. Local weather uses only your approximate location, and it isn’t stored.'}
     >
       <div ref={listRef} style={{ display: 'contents' }}>{body}</div>
     </Page>

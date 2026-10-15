@@ -49,18 +49,37 @@ function init(): Promise<Fb> {
    Auth
    ============================================================ */
 const toUser = (u: FbUser | null): User | null =>
-  (u ? { uid: u.uid, email: (u.email || '').toLowerCase(), name: u.displayName || u.email || '', photo: u.photoURL || '' } : null);
+  // Your chosen name, else the one from your Google account, else your email.
+  (u ? { uid: u.uid, email: (u.email || '').toLowerCase(), name: u.displayName || u.providerData?.[0]?.displayName || u.email || '', photo: u.photoURL || '' } : null);
 
-// Calls cb(user|null) now and whenever sign-in changes.
+// Who to tell when your own profile changes (Firebase only reports sign-in / sign-out).
+let userListener: ((u: User | null) => void) | null = null;
+
+// Calls cb(user|null) now and whenever sign-in changes (or you change your name).
 export async function onUserChange(cb: (u: User | null) => void): Promise<Unsubscribe | void> {
   if (!available()) { cb(null); return; }
   try {
     const { auth, A } = await init();
+    userListener = cb;
     return A.onAuthStateChanged(auth, (u) => cb(toUser(u)));
   } catch (e) {
     console.error('Firebase failed to load', e);
     cb(null);
   }
+}
+
+/** Your name in GoWander (your account, so every device sees it). Empty = back to your Google name. */
+export async function setMyName(name: string): Promise<void> {
+  const { auth, A } = await init();
+  const u = auth.currentUser;
+  if (!u) throw new Error('Sign in first.');
+  try {
+    await A.updateProfile(u, { displayName: name.trim().replace(/\s+/g, ' ').slice(0, 40) || null });
+  } catch (e) {
+    console.error('Saving your name failed', e);
+    throw new Error('Couldn\'t save your name. Check your connection and try again.');
+  }
+  userListener?.(toUser(auth.currentUser));
 }
 
 const codeOf = (e: unknown): string => (e as { code?: string } | null)?.code || '';

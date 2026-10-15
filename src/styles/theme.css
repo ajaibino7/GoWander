@@ -493,3 +493,89 @@ h1, h2, h3, .sec-h, .list-h, .now-title, .trip-card h3 { letter-spacing: -.015em
   :root { --glass: rgba(255, 255, 255, .9); --glass-strong: #fff; }
 }
 .nick-card.empty { background: color-mix(in srgb, var(--accent) 8%, var(--frost)); }
+
+/* ---------- home header: the landscape dissolves into the page ----------
+   Instead of a hard rounded edge, the hills and sea fade out into the colour wash below. A mask
+   (not an overlay) so it blends into whatever the background shows, in light and dark. */
+.hero.home {
+  border-radius: 0;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 70px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 70px), transparent);
+}
+/* A little air between the header and "Your trips". */
+#view-home { margin-top: 10px; }
+#view-home .home-head { padding-top: 6px; }
+
+/* ---------- home: today (greeting, what's next, local weather) ----------
+   A frosted card whose colours follow the time of day: warm at sunrise, blue in the afternoon,
+   rose and violet in the evening, indigo at night. */
+.today {
+  position: relative; overflow: hidden; isolation: isolate;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "hi wx" "line wx";
+  gap: 4px 20px; align-items: center; padding: 22px 22px 20px; border-radius: 26px;
+  animation: fade-up .6s var(--spring) both;
+}
+.today::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(120% 150% at 0% 0%, var(--tod-a), transparent 55%),
+    radial-gradient(90% 130% at 100% 100%, var(--tod-b), transparent 60%);
+}
+.tod-morning   { --tod-a: rgba(255, 176, 102, .34); --tod-b: rgba(255, 214, 140, .3);  --tod-name: linear-gradient(120deg, #ff8a3c, #ff5e7e); }
+.tod-afternoon { --tod-a: rgba(96, 170, 255, .3);   --tod-b: rgba(64, 210, 196, .26); --tod-name: var(--grad-primary); }
+.tod-evening   { --tod-a: rgba(255, 128, 140, .3);  --tod-b: rgba(146, 104, 255, .3); --tod-name: linear-gradient(120deg, #ff6a88, #8a5cff); }
+.tod-night     { --tod-a: rgba(84, 108, 230, .32);  --tod-b: rgba(150, 92, 230, .28); --tod-name: linear-gradient(120deg, #6f8dff, #b07cff); }
+
+.td-hi { grid-area: hi; min-width: 0; }
+.td-k { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 700; letter-spacing: .02em; color: var(--muted); }
+.td-name { margin: 4px 0 0; font-size: clamp(25px, 3.6vw, 32px); font-weight: 900; line-height: 1.15; letter-spacing: -.02em; overflow-wrap: anywhere; }
+.td-you { background: var(--tod-name); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.td-wave { display: inline-block; transform-origin: 70% 75%; animation: td-wave 1.9s ease-in-out .7s 1 both; }
+@keyframes td-wave {
+  0%, 60%, 100% { transform: rotate(0); } 10%, 30% { transform: rotate(14deg); }
+  20% { transform: rotate(-8deg); } 40% { transform: rotate(-4deg); } 50% { transform: rotate(10deg); }
+}
+.td-line { grid-area: line; margin: 6px 0 0; font-size: 14.5px; line-height: 1.5; color: var(--muted); }
+.td-line strong { color: var(--ink); font-weight: 800; }
+.td-go { font-weight: 800; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.td-go:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* the weather tile */
+.td-wx {
+  grid-area: wx; display: grid; justify-items: center; align-content: center; text-align: center; gap: 1px;
+  min-width: 136px; min-height: 128px; padding: 12px 14px; border-radius: 20px; box-sizing: border-box;
+  background: color-mix(in srgb, var(--surface) 55%, transparent); border: 1px solid var(--glass-line);
+  box-shadow: 0 0 0 .5px var(--glass-edge), var(--glass-hi), 0 12px 26px -16px rgba(40, 70, 130, .45);
+  animation: fade-in .5s ease .15s both;
+}
+.td-wx-ic { font-size: 34px; line-height: 1.15; animation: td-float 5s ease-in-out infinite; }
+@keyframes td-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.td-wx-t { font-size: 30px; font-weight: 900; line-height: 1.05; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.td-wx-t small { font-size: 13px; font-weight: 700; color: var(--muted); margin-left: 1px; vertical-align: 12px; }
+.td-wx-p { margin-top: 4px; max-width: 150px; font-size: 13px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.td-wx-l { max-width: 150px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.td-wx { font: inherit; color: inherit; cursor: pointer; transition: transform .45s var(--spring-pop), box-shadow .3s; }
+@media (hover: hover) { button.td-wx:hover { transform: translateY(-2px); box-shadow: 0 0 0 .5px var(--glass-edge), var(--glass-hi), 0 16px 30px -14px rgba(40, 70, 130, .5); } }
+button.td-wx:active { transform: scale(.96); }
+button.td-wx:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.td-wx.ask .td-wx-l { color: var(--accent); font-weight: 700; }
+.td-wx.loading { gap: 8px; }
+.td-sk { width: 64px; height: 30px; border-radius: 10px; background: linear-gradient(100deg, color-mix(in srgb, var(--ink) 6%, transparent) 30%, color-mix(in srgb, var(--ink) 12%, transparent) 50%, color-mix(in srgb, var(--ink) 6%, transparent) 70%) 0 0 / 200% 100%; animation: shimmer 1.4s linear infinite; }
+.td-sk.s { width: 88px; height: 12px; }
+
+@media (max-width: 560px) {
+  .today { grid-template-areas: "hi wx" "line line"; gap: 10px 12px; padding: 18px 16px 16px; }
+  .td-name { font-size: 24px; }
+  .td-wx { min-width: 108px; min-height: 104px; padding: 10px; border-radius: 18px; }
+  .td-wx-ic { font-size: 27px; }
+  .td-wx-t { font-size: 24px; }
+  .td-wx-p, .td-wx-l { max-width: 108px; }
+  .td-line { margin-top: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .td-wave, .td-wx-ic { animation: none; } }
+
+/* Account: your name */
+.name-card .nick-form { flex-wrap: wrap; margin-top: 2px; }
+.name-card .nick-form input { flex: 1 1 180px; }
+.name-show { margin: 0; font-size: 18px; }
+.td-wx-hl { display: flex; gap: 8px; margin-top: 1px; font-size: 11.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
