@@ -150,7 +150,7 @@ export function HomePage({ message = '' }: { message?: string }) {
           </div>
           <div className="home-actions">
             <button className="btn ghost" type="button" onClick={() => fileRef.current?.click()}><Icon.upload /> Import</button>
-            <Link className="btn" to="/edit/new"><Icon.plus /> New trip</Link>
+            <Link className="btn" to="/new"><Icon.plus /> New trip</Link>
           </div>
         </div>
         <div className="trip-list">
@@ -179,7 +179,7 @@ export function HomePage({ message = '' }: { message?: string }) {
               <div className="empty-art" aria-hidden="true">🧭</div>
               <div className="empty-t">Your next adventure starts here</div>
               <p>Create a trip, copy the sample, or import a trips file. Trips friends share with you appear here too.</p>
-              <div className="home-actions center"><Link className="btn" to="/edit/new"><Icon.plus /> Plan a trip</Link></div>
+              <div className="home-actions center"><Link className="btn" to="/new"><Icon.plus /> Plan a trip</Link></div>
             </div>
           )}
         </div>

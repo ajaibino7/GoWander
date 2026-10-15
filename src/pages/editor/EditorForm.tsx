@@ -6,7 +6,7 @@ import { isAutoUrl, smallUrl, type CoverInfo } from '../../lib/autocover';
 import {
   blankStop, dateRules, isCoverUrl, moveStopToDay, nextDayDate, prepareCover, sortDraft, swapStops, validateDraft,
 } from '../../lib/editing';
-import type { DraftStop, DraftTrip, NoteType, Place, StopKind, StopTag } from '../../lib/types';
+import type { Booking, DraftStop, DraftTrip, NoteType, Place, StopKind, StopTag } from '../../lib/types';
 import { PlacePicker } from './PlacePicker';
 import { cachedNearby } from '../../lib/nearby';
 import { dayLegs } from '../../lib/routing';
@@ -18,7 +18,25 @@ const TIMEZONES: string[] = (() => {
   }
 })();
 
-export type EditorNotice = { kind: 'saved'; who: string } | { kind: 'deleted' };
+// Tickets & bookings on a stop: closed until there's something in it.
+function BookingFields({ booking, onChange }: { booking: Booking | undefined; onChange: (key: keyof Booking, value: string) => void }) {
+  const b = booking || {};
+  const filled = Object.values(b).filter(Boolean).length;
+  return (
+    <details className="ed-booking" open={filled > 0 || undefined}>
+      <summary>🎫 Tickets &amp; booking{filled ? <span className="ed-count">{filled}</span> : <span className="muted"> · PNR, booking ref, phone, link</span>}</summary>
+      <div className="grid2">
+        <label className="fld"><span>Train PNR</span><input inputMode="numeric" maxLength={14} placeholder="10-digit PNR" value={b.pnr || ''} onChange={(e) => onChange('pnr', e.target.value)} /></label>
+        <label className="fld"><span>Booking reference</span><input maxLength={60} placeholder="e.g. 6E-ABC123" value={b.ref || ''} onChange={(e) => onChange('ref', e.target.value)} /></label>
+        <label className="fld"><span>Phone</span><input type="tel" maxLength={30} placeholder="Hotel or operator" value={b.phone || ''} onChange={(e) => onChange('phone', e.target.value)} /></label>
+        <label className="fld"><span>Ticket or booking link</span><input type="url" maxLength={500} placeholder="https://…" value={b.link || ''} onChange={(e) => onChange('link', e.target.value)} /></label>
+      </div>
+      <label className="fld"><span>Booking note</span><input maxLength={300} placeholder="e.g. Coach B2, seats 33–36 · check-in from 2 PM" value={b.note || ''} onChange={(e) => onChange('note', e.target.value)} /></label>
+    </details>
+  );
+}
+
+export type EditorNotice ={ kind: 'saved'; who: string } | { kind: 'deleted' };
 
 interface Props {
   start: DraftTrip;
@@ -217,6 +235,11 @@ export function EditorForm(props: Props) {
         {s.departure ? (
           <label className="chk sub">Be there <input type="number" className="num" min={0} max={360} step={5} value={s.departure.buffer} onChange={(e) => setStop((st) => { st.departure = { buffer: Number(e.target.value) }; })} /> minutes early</label>
         ) : null}
+        <BookingFields booking={s.booking} onChange={(key, value) => setStop((st) => {
+          const b = { ...(st.booking || {}), [key]: value };
+          for (const k of Object.keys(b) as (keyof Booking)[]) if (!b[k]) delete b[k];
+          if (Object.keys(b).length) st.booking = b; else delete st.booking;
+        })} />
       </div>
     );
   };

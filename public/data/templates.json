@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "id": "tpl-goa-3",
+      "title": "Goa Beaches + Old Goa",
+      "subtitle": "Sunsets at Baga, Portuguese forts, Old Goa's churches and the Latin Quarter in Panaji.",
+      "timezone": "Asia/Kolkata",
+      "tagline": "3 days · beaches, forts and churches",
+      "emoji": "🏖️",
+      "days": [
+        {
+          "date": "2000-01-01",
+          "title": "Arrive & North Goa beaches",
+          "stops": [
+            { "start": "10:00", "end": "11:30", "kind": "travel", "title": "Land at Goa airport", "note": "Pre-paid taxi to the hotel", "place": { "name": "Dabolim Airport", "lat": 15.3808, "lng": 73.8314, "radius": 800 } },
+            { "start": "12:30", "end": "13:30", "kind": "stay", "title": "Check in & freshen up", "place": { "name": "Candolim", "lat": 15.518, "lng": 73.762, "radius": 600, "approx": true } },
+            { "start": "13:30", "end": "14:30", "kind": "meal", "title": "Lunch in Candolim", "note": "Goan fish thali", "place": { "name": "Candolim", "lat": 15.518, "lng": 73.762, "radius": 600 } },
+            { "start": "15:00", "end": "16:30", "kind": "stop", "title": "Fort Aguada", "note": "Lighthouse and sea views", "tag": "closing", "place": { "name": "Fort Aguada", "lat": 15.492, "lng": 73.7737, "radius": 300 } },
+            { "start": "17:15", "end": "19:00", "kind": "stop", "title": "Sunset at Baga Beach", "tag": "must", "place": { "name": "Baga Beach", "lat": 15.5553, "lng": 73.7517, "radius": 400 } },
+            { "start": "19:30", "end": "21:00", "kind": "meal", "title": "Dinner and live music", "note": "Beach shacks along Baga", "place": { "name": "Baga", "lat": 15.5553, "lng": 73.7517, "radius": 500 } }
+          ],
+          "notes": [{ "type": "tip", "title": "Getting around", "text": "Rent a scooter for the day, or book cabs through GoaMiles." }]
+        },
+        {
+          "date": "2000-01-02",
+          "title": "Chapora, Anjuna & Calangute",
+          "stops": [
+            { "start": "08:30", "end": "09:30", "kind": "meal", "title": "Breakfast at the hotel", "place": { "name": "Candolim", "lat": 15.518, "lng": 73.762, "radius": 600 } },
+            { "start": "10:00", "end": "11:30", "kind": "stop", "title": "Chapora Fort", "note": "Short climb, wear good shoes", "tag": "key", "place": { "name": "Chapora Fort", "lat": 15.606, "lng": 73.736, "radius": 300 } },
+            { "start": "12:00", "end": "14:00", "kind": "stop", "title": "Anjuna flea market shopping", "place": { "name": "Anjuna Flea Market", "lat": 15.5733, "lng": 73.74, "radius": 400 } },
+            { "start": "14:00", "end": "15:00", "kind": "meal", "title": "Lunch in Anjuna", "place": { "name": "Anjuna", "lat": 15.5733, "lng": 73.74, "radius": 600 } },
+            { "start": "16:00", "end": "18:30", "kind": "stop", "title": "Calangute Beach", "tag": "optional", "place": { "name": "Calangute Beach", "lat": 15.5439, "lng": 73.7553, "radius": 500 } }
+          ],
+          "notes": [{ "type": "star", "title": "Don't miss", "text": "Chapora Fort in the morning, before it gets hot." }]
+        },
+        {
+          "date": "2000-01-03",
+          "title": "Old Goa, Panaji & fly home",
+          "stops": [
+            { "start": "09:00", "end": "10:30", "kind": "stop", "title": "Basilica of Bom Jesus", "tag": "must", "place": { "name": "Basilica of Bom Jesus", "lat": 15.5009, "lng": 73.9116, "radius": 300 } },
+            { "start": "11:15", "end": "12:45", "kind": "stop", "title": "Fontainhas Latin Quarter walk", "place": { "name": "Fontainhas, Panaji", "lat": 15.497, "lng": 73.833, "radius": 400 } },
+            { "start": "13:00", "end": "14:00", "kind": "meal", "title": "Lunch in Panaji", "place": { "name": "Panaji", "lat": 15.4989, "lng": 73.8278, "radius": 600 } },
+            { "start": "17:30", "end": "18:30", "kind": "travel", "title": "Flight home", "tag": "deadline", "departure": { "buffer": 120 }, "place": { "name": "Dabolim Airport", "lat": 15.3808, "lng": 73.8314, "radius": 800 } }
+          ],
+          "notes": [{ "type": "warn", "title": "Airport", "text": "Leave Panaji by 3 PM; traffic on the bridge can be slow." }]
+        }
+      ]
+    },
+    {
+      "id": "tpl-manali-5",
+      "title": "Manali + Solang Valley",
+      "subtitle": "Old Manali cafés, snow at Solang, the Atal Tunnel to Sissu, Jogini Falls and Naggar Castle.",
+      "timezone": "Asia/Kolkata",
+      "tagline": "5 days · mountains, snow and cafés",
+      "emoji": "🏔️",
+      "days": [
+        {
+          "date": "2000-01-01",
+          "title": "Arrive & Old Manali",
+          "stops": [
+            { "start": "09:00", "end": "10:00", "kind": "travel", "title": "Reach Manali", "note": "Overnight Volvo from Delhi", "place": { "name": "Manali Bus Stand", "lat": 32.2405, "lng": 77.189, "radius": 500 } },
+            { "start": "10:30", "end": "12:00", "kind": "stay", "title": "Check in & rest", "place": { "name": "Old Manali", "lat": 32.2568, "lng": 77.1786, "radius": 700, "approx": true } },
+            { "start": "13:00", "end": "14:00", "kind": "meal", "title": "Lunch at a riverside café", "place": { "name": "Old Manali", "lat": 32.2568, "lng": 77.1786, "radius": 700 } },
+            { "start": "15:00", "end": "16:30", "kind": "stop", "title": "Hadimba Devi Temple", "note": "Wooden temple in a cedar forest", "tag": "must", "place": { "name": "Hadimba Devi Temple", "lat": 32.2484, "lng": 77.1806, "radius": 300 } },
+            { "start": "17:00", "end": "19:30", "kind": "stop", "title": "Mall Road evening walk", "place": { "name": "Mall Road, Manali", "lat": 32.2432, "lng": 77.1892, "radius": 500 } }
+          ],
+          "notes": [{ "type": "tip", "title": "Take it easy", "text": "Go slow on day one after the overnight bus. Drink plenty of water." }]
+        },
+        {
+          "date": "2000-01-02",
+          "title": "Solang Valley & Atal Tunnel",
+          "stops": [
+            { "start": "08:30", "end": "09:30", "kind": "travel", "title": "Drive to Solang Valley", "place": { "name": "Solang Valley", "lat": 32.3166, "lng": 77.1574, "radius": 800 } },
+            { "start": "09:30", "end": "12:30", "kind": "stop", "title": "Solang: ropeway & paragliding", "tag": "key", "place": { "name": "Solang Valley", "lat": 32.3166, "lng": 77.1574, "radius": 800 } },
+            { "start": "12:30", "end": "13:30", "kind": "meal", "title": "Lunch at Solang", "note": "Maggi and hot chai", "place": { "name": "Solang Valley", "lat": 32.3166, "lng": 77.1574, "radius": 800 } },
+            { "start": "14:00", "end": "16:30", "kind": "stop", "title": "Through the Atal Tunnel to Sissu", "tag": "must", "place": { "name": "Sissu", "lat": 32.4777, "lng": 77.1306, "radius": 1000 } },
+            { "start": "17:30", "end": "18:30", "kind": "travel", "title": "Back to Manali", "place": { "name": "Old Manali", "lat": 32.2568, "lng": 77.1786, "radius": 700 } }
+          ],
+          "notes": [{ "type": "warn", "title": "Cold up there", "text": "Sissu and Solang are much colder than Manali. Carry a warm jacket and gloves." }]
+        },
+        {
+          "date": "2000-01-03",
+          "title": "Vashisht & Jogini Falls",
+          "stops": [
+            { "start": "09:00", "end": "10:00", "kind": "stop", "title": "Vashisht hot springs & temple", "place": { "name": "Vashisht", "lat": 32.2633, "lng": 77.1893, "radius": 400 } },
+            { "start": "10:30", "end": "13:00", "kind": "stop", "title": "Jogini Falls trek", "note": "About an hour up through orchards", "tag": "must", "place": { "name": "Jogini Falls", "lat": 32.2766, "lng": 77.1889, "radius": 400 } },
+            { "start": "13:30", "end": "14:30", "kind": "meal", "title": "Lunch in Vashisht", "place": { "name": "Vashisht", "lat": 32.2633, "lng": 77.1893, "radius": 400 } },
+            { "start": "16:00", "end": "18:00", "kind": "stop", "title": "Manu Temple & Old Manali lanes", "place": { "name": "Manu Temple", "lat": 32.2593, "lng": 77.1757, "radius": 400 } }
+          ],
+          "notes": []
+        },
+        {
+          "date": "2000-01-04",
+          "title": "Naggar & the Beas",
+          "stops": [
+            { "start": "09:30", "end": "10:45", "kind": "travel", "title": "Drive to Naggar", "place": { "name": "Naggar Castle", "lat": 32.1132, "lng": 77.1665, "radius": 400 } },
+            { "start": "10:45", "end": "12:30", "kind": "stop", "title": "Naggar Castle & Roerich Art Gallery", "tag": "key", "place": { "name": "Naggar Castle", "lat": 32.1132, "lng": 77.1665, "radius": 400 } },
+            { "start": "12:30", "end": "13:30", "kind": "meal", "title": "Lunch at the castle café", "place": { "name": "Naggar Castle", "lat": 32.1132, "lng": 77.1665, "radius": 400 } },
+            { "start": "15:00", "end": "17:00", "kind": "stop", "title": "River rafting on the Beas", "tag": "optional", "place": { "name": "Pirdi rafting point", "lat": 31.945, "lng": 77.12, "radius": 800, "approx": true } },
+            { "start": "18:00", "end": "19:30", "kind": "travel", "title": "Back to Manali", "place": { "name": "Old Manali", "lat": 32.2568, "lng": 77.1786, "radius": 700 } }
+          ],
+          "notes": []
+        },
+        {
+          "date": "2000-01-05",
+          "title": "Shopping & head home",
+          "stops": [
+            { "start": "09:00", "end": "10:00", "kind": "meal", "title": "Breakfast & checkout", "place": { "name": "Old Manali", "lat": 32.2568, "lng": 77.1786, "radius": 700 } },
+            { "start": "10:30", "end": "13:00", "kind": "stop", "title": "Tibetan market & shawl shopping", "place": { "name": "Mall Road, Manali", "lat": 32.2432, "lng": 77.1892, "radius": 500 } },
+            { "start": "17:00", "end": "17:30", "kind": "travel", "title": "Volvo back to Delhi", "tag": "deadline", "departure": { "buffer": 30 }, "place": { "name": "Manali Bus Stand", "lat": 32.2405, "lng": 77.189, "radius": 500 } }
+          ],
+          "notes": [{ "type": "tip", "title": "Bargain", "text": "Kullu shawls and caps are cheaper at the Tibetan market than on Mall Road." }]
+        }
+      ]
+    },
+    {
+      "id": "tpl-jaipur-2",
+      "title": "Jaipur Weekend",
+      "subtitle": "Amber Fort, the Pink City's palaces and bazaars, a Rajasthani dinner and sunrise at Nahargarh.",
+      "timezone": "Asia/Kolkata",
+      "tagline": "2 days · forts, palaces and bazaars",
+      "emoji": "🏰",
+      "days": [
+        {
+          "date": "2000-01-01",
+          "title": "Amber Fort & the Pink City",
+          "stops": [
+            { "start": "08:30", "end": "11:30", "kind": "stop", "title": "Amber Fort", "note": "Go early to beat the heat and the crowds", "tag": "must", "place": { "name": "Amber Fort", "lat": 26.9855, "lng": 75.8513, "radius": 400 } },
+            { "start": "12:00", "end": "12:30", "kind": "stop", "title": "Jal Mahal photo stop", "place": { "name": "Jal Mahal", "lat": 26.9535, "lng": 75.8462, "radius": 300 } },
+            { "start": "13:00", "end": "14:00", "kind": "meal", "title": "Lunch: Rajasthani thali", "place": { "name": "MI Road", "lat": 26.9157, "lng": 75.8098, "radius": 500, "approx": true } },
+            { "start": "14:30", "end": "16:00", "kind": "stop", "title": "City Palace", "tag": "key", "place": { "name": "City Palace, Jaipur", "lat": 26.9258, "lng": 75.8237, "radius": 300 } },
+            { "start": "16:00", "end": "16:45", "kind": "stop", "title": "Jantar Mantar", "place": { "name": "Jantar Mantar", "lat": 26.9248, "lng": 75.8246, "radius": 250 } },
+            { "start": "17:00", "end": "17:30", "kind": "stop", "title": "Hawa Mahal", "tag": "must", "place": { "name": "Hawa Mahal", "lat": 26.9239, "lng": 75.8267, "radius": 250 } },
+            { "start": "17:30", "end": "19:00", "kind": "stop", "title": "Johari & Bapu Bazaar shopping", "place": { "name": "Johari Bazaar", "lat": 26.922, "lng": 75.827, "radius": 500 } },
+            { "start": "19:30", "end": "21:30", "kind": "meal", "title": "Dinner at Chokhi Dhani", "note": "Folk dance and a Rajasthani feast", "place": { "name": "Chokhi Dhani", "lat": 26.7672, "lng": 75.8359, "radius": 500 } }
+          ],
+          "notes": [{ "type": "tip", "title": "Composite ticket", "text": "One composite ticket covers Amber Fort, Jantar Mantar, Hawa Mahal, Albert Hall and Nahargarh." }]
+        },
+        {
+          "date": "2000-01-02",
+          "title": "Nahargarh sunrise & museums",
+          "stops": [
+            { "start": "06:30", "end": "08:30", "kind": "stop", "title": "Sunrise at Nahargarh Fort", "tag": "key", "place": { "name": "Nahargarh Fort", "lat": 26.9373, "lng": 75.8155, "radius": 400 } },
+            { "start": "09:00", "end": "10:00", "kind": "meal", "title": "Breakfast: pyaaz kachori", "place": { "name": "Rawat Mishthan Bhandar", "lat": 26.9163, "lng": 75.7992, "radius": 300, "approx": true } },
+            { "start": "10:30", "end": "12:00", "kind": "stop", "title": "Albert Hall Museum", "place": { "name": "Albert Hall Museum", "lat": 26.9116, "lng": 75.8195, "radius": 300 } },
+            { "start": "12:30", "end": "13:30", "kind": "stop", "title": "Patrika Gate", "note": "The most colourful gate in Jaipur", "place": { "name": "Patrika Gate", "lat": 26.8418, "lng": 75.8007, "radius": 300 } },
+            { "start": "14:00", "end": "15:00", "kind": "meal", "title": "Lunch & a lassi", "place": { "name": "MI Road", "lat": 26.9167, "lng": 75.8075, "radius": 400, "approx": true } },
+            { "start": "16:30", "end": "17:00", "kind": "travel", "title": "Train home", "tag": "deadline", "departure": { "buffer": 30 }, "place": { "name": "Jaipur Junction", "lat": 26.9196, "lng": 75.7878, "radius": 500 } }
+          ],
+          "notes": []
+        }
+      ]
+    }
+  ]
+}

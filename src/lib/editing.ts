@@ -163,3 +163,30 @@ export async function prepareCover(file: File): Promise<string> {
   }
   throw new Error('That image is too detailed to fit in 500 KB. Try a smaller one.');
 }
+
+/**
+ * A photo for a bill or a journal entry: always resized and re-compressed as JPEG to fit in
+ * `max` bytes (default 280 KB, which stays under the 420,000-character limit in the rules once
+ * written as a data URL).
+ */
+export async function compressPhoto(file: File, max = 280 * 1024): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('Choose a photo (JPG, PNG or WebP).');
+  let bmp: ImageBitmap;
+  try { bmp = await createImageBitmap(file); } catch { throw new Error('That photo couldn\'t be opened. Try a JPG or PNG.'); }
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('That photo couldn\'t be opened. Try a JPG or PNG.');
+  for (const width of [1600, 1280, 1024, 800, 640]) {
+    const scale = Math.min(1, width / Math.max(bmp.width, bmp.height));
+    canvas.width = Math.round(bmp.width * scale);
+    canvas.height = Math.round(bmp.height * scale);
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+    for (const q of [0.8, 0.7, 0.6, 0.5]) {
+      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/jpeg', q));
+      if (blob && blob.size <= max) return readDataUrl(blob);
+    }
+  }
+  throw new Error('That photo is too detailed to store. Try another one.');
+}

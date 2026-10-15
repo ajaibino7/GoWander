@@ -1,13 +1,14 @@
 // "Save offline": one tap before the trip saves what the trip page fetches as you go —
 // weather, real travel times, the destination photo and nearby suggestions for every stop — so
-// it all still works with no signal. The plan, progress, checklist and expenses already work
-// offline through Firestore's offline copy. Map areas aren't pre-downloaded (OpenStreetMap's
+// it all still works with no signal — plus the SOS card's nearest hospitals and police. The plan,
+// progress, checklist and expenses already work offline through Firestore's offline copy. Map areas aren't pre-downloaded (OpenStreetMap's
 // tile rules forbid bulk downloads); areas you've viewed stay saved as usual.
 import type { Place, Trip } from './types';
 import { tripWeather } from './weather';
 import { tripLegs } from './routing';
 import { autoCover, sizedUrl, smallUrl } from './autocover';
 import { nearbyPlaces } from './nearby';
+import { nearestHelp } from './sos';
 
 export const PHOTO_CACHE = 'gw-photos';
 const statusKey = (id: string) => `gw-offline-${id}`;
@@ -42,7 +43,13 @@ export async function makeOfflineReady(
       if (!spots.has(k)) spots.set(k, s.place);
     }
   }
-  const total = 3 + spots.size;
+  // SOS: hospitals, police and pharmacies around each day's area (sos.ts caches by ~1 km cell).
+  const areas = new Map<string, Place>();
+  for (const d of days) {
+    const p = d.stops[0]?.place;
+    if (p && Number.isFinite(p.lat)) areas.set(`${p.lat.toFixed(2)},${p.lng.toFixed(2)}`, p);
+  }
+  const total = 3 + spots.size + areas.size;
   let done = 0, failed = 0;
   const step = async (label: string, fn: () => Promise<unknown>) => {
     onProgress({ done, total, label });
@@ -63,6 +70,7 @@ export async function makeOfflineReady(
     n++;
     await step(`Nearby places ${n} of ${spots.size}`, () => nearbyPlaces(place));
   }
+  for (const place of areas.values()) await step('Emergency help nearby', () => nearestHelp(place));
   onProgress({ done, total, label: 'Done' });
 
   const result: OfflineStatus = { at: Date.now(), places: spots.size, failed };

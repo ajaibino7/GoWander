@@ -33,7 +33,37 @@ view it, and signed-in users can copy it into their own trips.
 - **Offline:** installable, and trips open and edits queue without signal. They sync when
   you're back online.
 
-Your location stays on your device and is never uploaded.
+**Planning together**
+- **Templates:** start a new trip from a ready-made plan (Goa, Manali, Jaipur) moved to your dates.
+- **Ideas board:** anyone adds places they'd like to visit and ❤️s others'; editors add the
+  favourites to a day.
+- **Polls:** "Dinner: A or B?" Everyone votes; the winner can go straight into the plan.
+- **Smart tips & packing:** each day gets tips from the forecast, travel times and the plan, and
+  the checklist can fill itself from the trip (beaches, treks, trains, rain, nights away).
+
+**On the go**
+- **Share the day** to WhatsApp: times, places with map links, tickets and notes.
+- **Tickets & bookings** on each stop (PNR with a status check, booking refs, phone, links), all
+  in one place and offline.
+- **Running late?** Push the rest of the day back; fixed departures stay put, and clashes are flagged.
+- **Where's everyone?** Members can choose to share their location with the trip until tonight or
+  for an hour, and see each other on the map.
+- **SOS:** local emergency numbers, the nearest hospitals, police and pharmacies (saved for
+  offline use), and your stay's address to show a driver.
+
+**Money**
+- **Budget** per person, with spending day by day and a heads-up before you go over.
+- **Split by amount**, categories, bill photos, and a spending chart by category and person.
+- **Settle up with UPI:** a one-tap payment link (a QR code on computers).
+
+**Memories**
+- **Journal:** photos and moments per stop or day, as a story you can save as a PDF.
+- **Reviews:** 👍 / 👎 and a note on each stop.
+- **Recap:** the trip in numbers and the group's favourites, as a picture to share; "Plan it again"
+  starts a new trip without the thumbs-down stops.
+
+Your location stays on your device unless you choose to share it with your trip ("Where's
+everyone?"), and sharing stops by itself.
 
 ## Who can do what
 

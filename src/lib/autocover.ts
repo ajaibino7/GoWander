@@ -21,7 +21,11 @@ export interface CoverInfo {
 /** The minimum a trip needs for a cover lookup (drafts in the editor qualify too). */
 export interface CoverTrip { title?: string; days?: { stops?: { place: Place | null }[] }[] }
 
-// The area with the most stops (about 50 km cells), and the first place in it.
+// Airports, stations and bus stands make poor cover photos for a destination.
+const HUB = /\b(airport|station|terminus|terminal|junction|bus stand|bus stop|railway|metro)\b/i;
+
+// The area with the most stops (about 50 km cells), and the first place in it that isn't a
+// transport hub (unless that's all there is).
 export function mainPlace(trip: CoverTrip): Place | null {
   const cells = new Map<string, { n: number; place: Place }>();
   for (const d of trip.days || []) {
@@ -29,6 +33,7 @@ export function mainPlace(trip: CoverTrip): Place | null {
       if (!s.place || !Number.isFinite(s.place.lat)) continue;
       const k = `${Math.round(s.place.lat * 2)},${Math.round(s.place.lng * 2)}`;
       const cell = cells.get(k) || { n: 0, place: s.place };
+      if (HUB.test(cell.place.name) && !HUB.test(s.place.name)) cell.place = s.place;
       cell.n++;
       cells.set(k, cell);
     }

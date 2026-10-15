@@ -5,7 +5,10 @@ import { useLocation } from 'react-router-dom';
 import { prefersReducedMotion } from '../lib/util';
 
 // How deep each screen sits.
-const DEPTH: Record<string, number> = { home: 0, account: 1, import: 1, trip: 1, edit: 2, members: 2, checklist: 2, expenses: 2 };
+const DEPTH: Record<string, number> = {
+  home: 0, account: 1, import: 1, new: 1, trip: 1,
+  edit: 2, members: 2, checklist: 2, expenses: 2, tickets: 2, ideas: 2, polls: 2, journal: 2, recap: 2, sos: 2,
+};
 export const screenOf = (pathname: string): string => pathname.split('/')[1] || 'home';
 
 export interface NavMotion {

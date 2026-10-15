@@ -15,6 +15,13 @@ import { AccountPage } from './pages/Account';
 import { ImportSharedPage } from './pages/ImportShared';
 import { ChecklistPage } from './pages/Checklist';
 import { ExpensesPage } from './pages/Expenses';
+import { TicketsPage } from './pages/Tickets';
+import { SosPage } from './pages/Sos';
+import { IdeasPage } from './pages/Ideas';
+import { PollsPage } from './pages/Polls';
+import { JournalPage } from './pages/Journal';
+import { RecapPage } from './pages/Recap';
+import { NewTripPage } from './pages/NewTrip';
 
 // Test mode only: never downloaded otherwise.
 const TestKit = sim.enabled ? lazy(() => import('./app/TestKit')) : null;
@@ -66,6 +73,13 @@ const router = createHashRouter([
           { path: 'import/:payload', element: <ImportSharedPage /> },
           { path: 'checklist/:id', element: <ChecklistPage /> },
           { path: 'expenses/:id', element: <ExpensesPage /> },
+          { path: 'tickets/:id', element: <TicketsPage /> },
+          { path: 'sos/:id', element: <SosPage /> },
+          { path: 'ideas/:id', element: <IdeasPage /> },
+          { path: 'polls/:id', element: <PollsPage /> },
+          { path: 'journal/:id', element: <JournalPage /> },
+          { path: 'recap/:id', element: <RecapPage /> },
+          { path: 'new', element: <NewTripPage /> },
           { path: '*', element: <HomePage /> },
         ],
       },

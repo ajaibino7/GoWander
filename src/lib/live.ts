@@ -2,7 +2,7 @@
 // running behind, leave now…), location tracking, and a small shared store. The trip page and
 // the test panel both read and change this state; React components subscribe with useLive().
 import { useSyncExternalStore } from 'react';
-import type { Day, Place, Stop, Trip } from './types';
+import type { Day, MemberLocation, Place, Review, Stop, Trip } from './types';
 import {
   esc, distM, fmtDist, estimateTravel, isHere, fmtDur, makeClock, THEMES, weekdayOf, shortDate,
   type Clock, type Position, type Theme,
@@ -128,6 +128,11 @@ export const live = {
   refit: 0,
   /** The Leaflet map, once built (the test panel's "click map to place me" uses it). */
   map: null as import('leaflet').Map | null,
+  /** "Where's everyone?": the group layer is showing, and members' shared locations. */
+  groupOn: false,
+  group: [] as MemberLocation[],
+  /** Members' 👍 / 👎 on stops (shared trips). */
+  reviews: [] as Review[],
 };
 
 let version = 0;
@@ -530,6 +535,9 @@ export function mountTrip(trip: Trip, { onDone = null as ((stopId: string, on: b
 
 export function unmountTrip(): void {
   live.trip = null;
+  live.groupOn = false;
+  live.group = [];
+  live.reviews = [];
   extrasSig = '';
   live.nearby = null;
   nearbyReq++;

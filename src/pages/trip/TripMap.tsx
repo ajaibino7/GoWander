@@ -6,10 +6,12 @@ import type { Map as LMap, LayerGroup, Marker, LatLngExpression, LatLngTuple } f
 import { emit, live, stopState, now, useLive, type LiveStop, type NearbyState } from '../../lib/live';
 import { intentFor } from '../../lib/nearby';
 import { esc, directionsUrl, fmtDist, fmtHHMM, prefersReducedMotion, THEME_COLORS } from '../../lib/util';
+import { avatarColor } from '../../components/Icons';
 
 // Leaflet arrives with the map (see TripMap); everything below runs only once the map exists.
 let L!: typeof import('leaflet');
-let layer: LayerGroup | null = null, meLayer: LayerGroup | null = null, nearLayer: LayerGroup | null = null;
+let layer: LayerGroup | null = null, meLayer: LayerGroup | null = null, nearLayer: LayerGroup | null = null, groupLayer: LayerGroup | null = null;
+let lastGroupSig = '', groupFitted = false;
 let lastMapDay: number | null = null, lastMapSig = '', lastRefit = -1, lastNearbyKey: unknown = null, lastNearbySig = '';
 const stopMarkers = new Map<string, Marker>();
 const nearMarkers = new Map<string, Marker>();
@@ -78,6 +80,41 @@ function renderMe(): void {
     .bindPopup('You are here').addTo(meLayer);
 }
 
+// "Where's everyone?": members sharing their location, as their avatar (faded when it's old).
+const STALE = 15 * 60000;
+function renderGroup(map: LMap): void {
+  if (!groupLayer) return;
+  const people = live.groupOn ? live.group.filter((g) => g.email !== groupSelf) : [];
+  const sig = people.map((g) => `${g.email}:${g.lat},${g.lng}:${Date.now() - g.atMs > STALE}`).join('|');
+  if (sig !== lastGroupSig) {
+    lastGroupSig = sig;
+    groupLayer.clearLayers();
+    for (const g of people) {
+      const stale = Date.now() - g.atMs > STALE;
+      const name = g.email.split('@')[0] || g.email;
+      const icon = L.divIcon({ className: '', html: `<div class="grp-marker${stale ? ' stale' : ''}" style="background:${avatarColor(g.email)}">${esc((name[0] || '?').toUpperCase())}</div>`, iconSize: [32, 32], iconAnchor: [16, 16] });
+      const ago = Math.round((Date.now() - g.atMs) / 60000);
+      L.marker([g.lat, g.lng], { icon, zIndexOffset: 900 }).bindPopup(`<strong>${esc(name)}</strong><br>${ago < 1 ? 'Just now' : `${ago} min ago`}<div class="pop-actions"><a href="${directionsUrl(g)}" target="_blank" rel="noopener">Directions</a></div>`).addTo(groupLayer);
+    }
+  }
+  // Opening the group map: fit everyone (and you) in view, once.
+  if (live.groupOn && !groupFitted && people.length) {
+    groupFitted = true;
+    const pts: LatLngTuple[] = people.map((g) => [g.lat, g.lng]);
+    if (live.pos) pts.push([live.pos.lat, live.pos.lng]);
+    setTimeout(() => (pts.length > 1 ? map.fitBounds(pts, { padding: [40, 40], maxZoom: 16 }) : map.setView(pts[0] as LatLngTuple, 15)), 0);
+  }
+  if (!live.groupOn) groupFitted = false;
+}
+/** Your email, so your own shared location isn't drawn twice (you're the blue dot). */
+let groupSelf = '';
+export function setGroupSelf(email: string): void { groupSelf = email; }
+/** Centre the map on a member. */
+export function mapFocusMember(email: string): void {
+  const g = live.group.find((x) => x.email === email);
+  if (g && live.map) live.map.setView([g.lat, g.lng], Math.max(live.map.getZoom(), 16));
+}
+
 const shownNearby = (nb: NearbyState) => (nb.filter === 'all' ? nb.items : nb.items.filter((x) => x.cat === nb.filter));
 
 function renderNearby(map: LMap): void {
@@ -144,6 +181,7 @@ export function TripMap() {
       layer = L.layerGroup().addTo(map);
       nearLayer = L.layerGroup().addTo(map);
       meLayer = L.layerGroup().addTo(map);
+      groupLayer = L.layerGroup().addTo(map);
       live.map = map;
       lastMapDay = null; lastMapSig = ''; lastRefit = -1; lastNearbyKey = null; lastNearbySig = '';
       emit();
@@ -153,7 +191,9 @@ export function TripMap() {
       clearTimeout(timer);
       live.map?.remove();
       live.map = null;
-      layer = meLayer = nearLayer = null;
+      layer = meLayer = nearLayer = groupLayer = null;
+      lastGroupSig = '';
+      groupFitted = false;
       stopMarkers.clear();
       nearMarkers.clear();
     };
@@ -165,6 +205,7 @@ export function TripMap() {
     renderStops(map);
     renderNearby(map);
     renderMe();
+    renderGroup(map);
   }, [v]);
 
   return <div id="map" ref={el} role="region" aria-label="Map of the day's stops" />;

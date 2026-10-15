@@ -142,8 +142,8 @@ nwr["amenity"~"^(bar|pub|biergarten|nightclub)$"]["name"]${drink}->.drink;
 .shop out center tags 60;`;
 }
 
-type Tags = Record<string, string | undefined>;
-interface OsmElement { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Tags }
+export type Tags = Record<string, string | undefined>;
+export interface OsmElement { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Tags }
 
 const classify = (tags: Tags) => KINDS.find((x) => tags[x.k] === x.v) || null;
 
@@ -212,7 +212,7 @@ const cacheKey = (p: LatLng) => `gw-near2-${p.lat.toFixed(4)},${p.lng.toFixed(4)
 
 // The public servers are volunteer-run and often busy. Ask the first; if it fails, or hasn't
 // answered within a few seconds, also ask the next. The first good answer wins.
-function fetchOverpass(body: string): Promise<{ elements?: OsmElement[] }> {
+export function fetchOverpass(body: string): Promise<{ elements?: OsmElement[] }> {
   return new Promise((resolve, reject) => {
     const ctls: AbortController[] = [];
     let next = 0, failed = 0, settled = false;

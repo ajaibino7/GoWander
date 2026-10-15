@@ -29,6 +29,20 @@ export interface Stop {
   tag?: StopTag;
   /** A fixed departure (train, flight, bus): be there `buffer` minutes early. */
   departure?: { buffer: number };
+  /** Tickets and bookings for this stop, kept with the plan so they work offline. */
+  booking?: Booking;
+}
+
+/** Ticket or booking details on a stop. Every field is optional. */
+export interface Booking {
+  /** Booking reference / confirmation number. */
+  ref?: string;
+  /** Indian Railways PNR (10 digits): gets a "Check status" link. */
+  pnr?: string;
+  phone?: string;
+  /** Ticket, e-ticket or booking page. */
+  link?: string;
+  note?: string;
 }
 
 export interface DayNote { type: NoteType; title: string; text: string }
@@ -94,6 +108,7 @@ export interface ChecklistItem {
 }
 
 export type ExpenseKind = 'expense' | 'settlement';
+export type ExpenseCategory = 'food' | 'travel' | 'stay' | 'tickets' | 'shopping' | 'other';
 export interface ExpenseInput {
   title: string;
   amount: number;
@@ -104,9 +119,80 @@ export interface ExpenseInput {
   split: string[];
   date: string;
   kind: ExpenseKind;
+  category?: ExpenseCategory;
+  /** Split by amount instead of equally: member → their part (adds up to `amount`). */
+  shares?: Record<string, number>;
+  /** A photo of the bill is stored (photos/bill-<id>). */
+  hasBill?: boolean;
 }
 export interface Expense extends ExpenseInput {
   id: string;
   createdBy: string;
   createdMs: number;
+}
+
+/* ---------- planning together ---------- */
+/** A place someone would like to visit, not in the plan yet. */
+export interface Idea {
+  id: string;
+  title: string;
+  note: string;
+  place: Place | null;
+  link: string;
+  createdBy: string;
+  createdMs: number;
+  /** Members who'd like to go. */
+  likes: string[];
+}
+
+export interface PollOption { id: string; text: string; place: Place | null }
+export interface Poll {
+  id: string;
+  question: string;
+  options: PollOption[];
+  /** Member email → the option id they picked. */
+  votes: Record<string, string>;
+  /** The day it's about (YYYY-MM-DD), or ''. */
+  dayDate: string;
+  closed: boolean;
+  createdBy: string;
+  createdMs: number;
+}
+
+/** Trip budget, per person, in one currency. */
+export interface Budget { perPerson: number; currency: string }
+
+/** A member's details for the group: their UPI ID for settling up. */
+export interface Profile { email: string; upi: string }
+
+/** Where a member is right now, if they chose to share it. */
+export interface MemberLocation {
+  email: string;
+  lat: number;
+  lng: number;
+  accuracy: number;
+  atMs: number;
+  /** Sharing stops after this (ms). */
+  untilMs: number;
+}
+
+/* ---------- memories ---------- */
+export interface JournalEntry {
+  id: string;
+  dayDate: string;
+  /** The stop it's about, or ''. */
+  stopId: string;
+  text: string;
+  /** A photo is stored (photos/j-<id>). */
+  hasPhoto: boolean;
+  createdBy: string;
+  createdMs: number;
+}
+
+/** One member's 👍 / 👎 on a stop, with an optional note. */
+export interface Review {
+  stopId: string;
+  email: string;
+  vote: 1 | -1;
+  note: string;
 }

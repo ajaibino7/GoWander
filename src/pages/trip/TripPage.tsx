@@ -10,7 +10,7 @@ import { AccountChip, BackLink } from '../../components/Hero';
 import { Page } from '../../components/Page';
 import * as cloud from '../../lib/cloud';
 import {
-  closeNearby, live, mountTrip, now, openNearby, refitMap, setDoneMarks, syncFollow, tripPhase, unmountTrip, useLive,
+  closeNearby, emit, live, mountTrip, now, openNearby, refitMap, setDoneMarks, syncFollow, tripPhase, unmountTrip, useLive, type LiveDay,
 } from '../../lib/live';
 import { canEditTrip } from '../../lib/tripStatus';
 import { fmtDur, fmtRange } from '../../lib/util';
@@ -23,6 +23,8 @@ import { DayTabs, DayView } from './DayView';
 import { TripMap } from './TripMap';
 import { NearbyPanel, scrollToMapCard } from './NearbyPanel';
 import { TripTools } from './TripTools';
+import { RunningLateSheet } from './RunningLate';
+import { GroupPanel, useGroupSharing } from './GroupMap';
 
 interface ViewProps {
   trip: Trip;
@@ -39,10 +41,14 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
   const { user } = useAppData();
   const navigate = useNavigate();
   const [copying, setCopying] = useState(false);
+  const [lateDay, setLateDay] = useState<LiveDay | null>(null);
   const wrap = useRef<HTMLDivElement>(null);
   useLive();
   // Opening a trip: the status card, tools and the day's stops rise in one after another.
-  useReveal(wrap, '.status-card, .trip-tools, .tabs, .day-band, .timeline > li');
+  useReveal(wrap, '.status-card, .hub, .tabs, .day-band, .timeline > li');
+  // Shared trips: your location for the group map (when you share it), and everyone else's.
+  const shared = !!entry && !!user && !sample && !preview;
+  useGroupSharing(shared ? trip.id : null, shared ? user : null);
 
   // Start the live engine for this trip before the first paint; a new version of the same trip
   // (another member's edit) keeps your place in the page.
@@ -52,7 +58,8 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
 
   // The map card grows a panel for nearby places: tell the map its size changed.
   const nearbyOpen = !!live.nearby;
-  useEffect(() => { setTimeout(() => live.map?.invalidateSize(), 0); }, [nearbyOpen]);
+  const groupOpen = live.groupOn;
+  useEffect(() => { setTimeout(() => live.map?.invalidateSize(), 0); }, [nearbyOpen, groupOpen]);
 
   if (live.trip?.id !== trip.id) return null; // the engine starts in the layout effect, before paint
   const t = now();
@@ -103,6 +110,13 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
     );
 
   const onNearby = () => scrollToMapCard();
+  // "Group map": open the panel under the map and bring it into view (on a wide screen the map
+  // column stays put, so the panel would otherwise open out of sight).
+  const openGroup = () => {
+    live.groupOn = true;
+    emit();
+    setTimeout(() => document.querySelector('.group-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+  };
 
   return (
     <Page
@@ -123,22 +137,30 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
         }}
       >
         <div className="col-main">
-          <StatusCard onNearby={onNearby} />
-          {preview ? null : <TripTools trip={trip} sample={sample} />}
+          <StatusCard onNearby={onNearby} onLate={entry && user && canEditTrip(entry.meta, user) ? setLateDay : undefined} />
+          {preview ? null : <TripTools trip={trip} sample={sample} onGroup={openGroup} />}
           <DayTabs phase={phase} />
-          <DayView phase={phase} onNearby={onNearby} />
+          <DayView
+            phase={phase}
+            onNearby={onNearby}
+            review={shared && user ? { me: user.email, save: (stopId, vote, note) => { cloud.setReview(user, trip.id, stopId, vote, note).catch((e: Error) => toast(e.message, 'bad')); } } : undefined}
+          />
         </div>
         <aside className="col-map">
-          <div className={`map-card${nearbyOpen ? ' has-nearby' : ''}`}>
+          <div className={`map-card${nearbyOpen ? ' has-nearby' : ''}${groupOpen ? ' has-group' : ''}`}>
             <TripMap />
             <div className="map-foot">
               <button type="button" className="link-btn" onClick={() => { closeNearby(false); refitMap(); }}>Show all stops</button>
               <button type="button" className="link-btn" disabled={!live.pos} onClick={() => { if (live.pos && live.map) live.map.setView([live.pos.lat, live.pos.lng], 16); }}>Centre on me</button>
             </div>
             <NearbyPanel />
+            {live.groupOn && shared && entry && user ? (
+              <GroupPanel tripId={trip.id} user={user} members={entry.meta.memberEmails} endOfDay={live.clock.at(live.clock.dateKey(now()), '23:59').getTime()} />
+            ) : null}
           </div>
         </aside>
       </div>
+      {lateDay && entry && user ? <RunningLateSheet day={lateDay} entry={entry} user={user} onClose={() => setLateDay(null)} /> : null}
     </Page>
   );
 }
@@ -184,6 +206,7 @@ export function TripPage() {
       if (!progressStarted) {
         progressStarted = true;
         cloud.watchProgress(id, setDoneMarks).then(keep);
+        cloud.watchReviews(id, (r) => { live.reviews = r; emit(); }).then(keep);
       }
     }, (err) => {
       if (err === 'denied') setDenied(true);

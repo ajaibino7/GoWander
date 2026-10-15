@@ -1,7 +1,7 @@
 // The card at the top of the trip page: where you are in the trip right now — countdown, the
 // stop in progress, whether you're on track, when to leave, and quick actions.
 import { distM, directionsUrl, dayMonth, fmtDist, fmtDur, fmtHHMM } from '../../lib/util';
-import { live, liveStatus, startWatch, toggleDone, openNearby, now, tripPhase, type Pill, type Stat, type LocState } from '../../lib/live';
+import { live, liveStatus, startWatch, toggleDone, openNearby, now, tripPhase, type Pill, type Stat, type LocState, type LiveDay } from '../../lib/live';
 import { intentFor } from '../../lib/nearby';
 import { sim } from '../../lib/live';
 
@@ -32,7 +32,8 @@ function locLabel(loc: LocState): { cls: string; text: string } {
   }
 }
 
-export function StatusCard({ onNearby }: { onNearby: (stopId: string) => void }) {
+/** onLate: "Running late?" (shift the rest of the day), for members who can edit the plan. */
+export function StatusCard({ onNearby, onLate }: { onNearby: (stopId: string) => void; onLate?: (day: LiveDay) => void }) {
   const t = now();
   const ph = tripPhase(t);
   const days = live.days;
@@ -76,7 +77,10 @@ export function StatusCard({ onNearby }: { onNearby: (stopId: string) => void })
         <div className="now-title">Day {nd.n} starts {ph.phase === 'night' ? 'tomorrow' : 'soon'}</div>
         <div className="now-meta">{fmtHHMM(s.start)} — {s.title} · in {fmtDur(s.startAt.getTime() - t.getTime())}</div>
         <Stats stats={[{ k: 'First stop', v: fmtHHMM(s.start), s: s.place.name }, ...(live.pos ? [{ k: 'Distance', v: fmtDist(distM(live.pos, s.place)), s: 'to first stop' }] : [])]} />
-        <div className="actions"><a className="btn" href={directionsUrl(s.place)} target="_blank" rel="noopener">Directions</a></div>
+        <div className="actions">
+          <a className="btn" href={directionsUrl(s.place)} target="_blank" rel="noopener">Directions</a>
+          {onLate && ph.phase === 'morning' ? <button className="btn ghost" type="button" onClick={() => onLate(nd)}>⏱️ Running late?</button> : null}
+        </div>
       </>
     ) : null;
   } else {
@@ -96,6 +100,7 @@ export function StatusCard({ onNearby }: { onNearby: (stopId: string) => void })
           <a className="btn" href={directionsUrl(focus.place)} target="_blank" rel="noopener">Directions</a>
           <button className="btn ghost" type="button" onClick={() => { openNearby(focus.id); onNearby(focus.id); }}>{intentFor(focus).button}</button>
           <button className="btn ghost" type="button" onClick={() => toggleDone(focus.id)}>{st.cur ? 'Done / skip' : 'Skip this'}</button>
+          {onLate ? <button className="btn ghost" type="button" onClick={() => onLate(ph.day)}>⏱️ Running late?</button> : null}
         </div>
       </>
     ) : (

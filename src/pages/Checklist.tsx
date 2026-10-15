@@ -12,6 +12,7 @@ import { toast } from '../lib/toast';
 import type { ChecklistItem, ChecklistList } from '../lib/types';
 import { HomePage } from './Home';
 import { JoinTrip } from './trip/JoinTrip';
+import { PackingSheet } from './PackingSheet';
 
 const CHECKLISTS: Record<ChecklistList, { title: string; placeholder: string; noun: string; ideas: string[] }> = {
   packing: {
@@ -31,6 +32,7 @@ export function ChecklistPage() {
   const [items, setItems] = useState<ChecklistItem[] | null>(null);
   // Items ticked just now get a little "pop" (the list redraws on every change).
   const [justTicked, setJustTicked] = useState<string | null>(null);
+  const [packing, setPacking] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,6 +91,13 @@ export function ChecklistPage() {
                   </li>
                 )) : <li className="cl-empty muted small">Nothing here yet. Add your own, or pick from the ideas below.</li>}
               </ul>
+              {list === 'packing' ? (
+                <button className="smart-btn" type="button" onClick={() => setPacking(true)}>
+                  <span className="smart-spark" aria-hidden="true">✨</span>
+                  <span><strong>Pack from the trip</strong><span className="muted small">Suggestions from your stops, the forecast and trip length</span></span>
+                  <span aria-hidden="true">›</span>
+                </button>
+              ) : null}
               <AddForm placeholder={c.placeholder} onAdd={(text) => add(list, text)} />
               {ideas.length ? (
                 <div className="cl-ideas">
@@ -99,6 +108,7 @@ export function ChecklistPage() {
           );
         })}
       </div>
+      {packing ? <PackingSheet trip={entry.trip} user={user} existing={(items || []).filter((x) => x.list === 'packing').map((x) => x.text)} onClose={() => setPacking(false)} /> : null}
     </Page>
   );
 }

@@ -258,7 +258,7 @@ button { font: inherit; color: inherit; }
 /* Phones: status → day tabs → map → timeline. */
 @media (max-width: 899px) {
   .col-main { display: contents; }
-  .status-card, .trip-tools { order: 1; }
+  .status-card, .trip-tools, .hub { order: 1; }
   .tabs { order: 2; }
   .col-map { order: 3; }
   .day { order: 4; }

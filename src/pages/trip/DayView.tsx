@@ -1,6 +1,6 @@
 // Day tabs and the selected day's timeline: stops with times, notes, distance, weather at the
 // stop's start, road travel time from the previous place, and actions when a stop is opened.
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { bestMode } from '../../lib/routing';
 import { forecastFrom } from '../../lib/weather';
 import { intentFor } from '../../lib/nearby';
@@ -10,6 +10,7 @@ import {
 } from '../../lib/live';
 import { mapFocusStop } from './TripMap';
 import { DayTips } from './DayTips';
+import { BookingCard } from '../../components/BookingCard';
 
 export function DayTabs({ phase }: { phase: Phase }) {
   const todayN = 'day' in phase ? phase.day.n : undefined;
@@ -69,7 +70,35 @@ function Leg({ day, s }: { day: LiveDay; s: LiveStop }) {
   );
 }
 
-export function DayView({ phase, onNearby }: { phase: Phase; onNearby: (stopId: string) => void }) {
+/** Rating stops (shared trips): who you are, and how to save your 👍 / 👎. */
+export interface ReviewHooks { me: string; save: (stopId: string, vote: 1 | -1 | null, note: string) => void }
+
+// "How was it?" — 👍 / 👎 and a note for next time, once a stop has started.
+function StopReview({ s, review }: { s: LiveStop; review: ReviewHooks }) {
+  const mine = live.reviews.find((r) => r.stopId === s.id && r.email === review.me);
+  const [note, setNote] = useState(mine?.note || '');
+  const vote = (v: 1 | -1) => review.save(s.id, mine?.vote === v ? null : v, note);
+  return (
+    <div className="stop-review">
+      <span className="sr-q">How was it?</span>
+      <button type="button" className={`sr-b${mine?.vote === 1 ? ' on up' : ''}`} aria-pressed={mine?.vote === 1} onClick={() => vote(1)}>👍</button>
+      <button type="button" className={`sr-b${mine?.vote === -1 ? ' on down' : ''}`} aria-pressed={mine?.vote === -1} onClick={() => vote(-1)}>👎</button>
+      {mine ? (
+        <input
+          className="sr-note"
+          maxLength={300}
+          placeholder="A note for next time (optional)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onBlur={() => { if (note !== mine.note) review.save(s.id, mine.vote, note); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+export function DayView({ phase, onNearby, review }: { phase: Phase; onNearby: (stopId: string) => void; review?: ReviewHooks }) {
   const t = now();
   const day = live.days.find((d) => d.n === live.selectedDay);
   // Slide the day in from the side of the tab that was picked.
@@ -124,6 +153,8 @@ export function DayView({ phase, onNearby }: { phase: Phase; onNearby: (stopId: 
                   {s.title}
                   {s.tag ? <span className={`tag ${s.tag}`}>{TAG_LABELS[s.tag]}</span> : null}
                   {s.departure ? <span className="tag deadline">Departure</span> : null}
+                  {s.booking ? <span className="tag ticket" title="Tickets & booking details">🎫 Ticket</span> : null}
+                  <ReviewTally stopId={s.id} />
                   {ss === 'now' ? <span className="tag nowtag">Now</span> : null}
                   {here ? <span className="tag heretag">You're here</span> : null}
                 </div>
@@ -138,9 +169,11 @@ export function DayView({ phase, onNearby }: { phase: Phase; onNearby: (stopId: 
                 {selected ? (
                   // Created when the stop opens and kept while it's open, so the ease-in plays once.
                   <div className="stop-actions opening">
+                    {s.booking ? <BookingCard booking={s.booking} compact /> : null}
                     <a className="mini" href={directionsUrl(s.place)} target="_blank" rel="noopener">Directions</a>
                     <button className="mini" type="button" onClick={() => { openNearby(s.id); onNearby(s.id); }}>{intentFor(s).icon} {intentFor(s).button}</button>
                     <button className="mini" type="button" onClick={() => toggleDone(s.id)}>{live.done.has(s.id) ? 'Undo done' : 'Mark done / skip'}</button>
+                    {review && (ss !== 'upcoming' || phase.phase === 'after') ? <StopReview s={s} review={review} /> : null}
                   </div>
                 ) : null}
               </div>
@@ -155,4 +188,13 @@ export function DayView({ phase, onNearby }: { phase: Phase; onNearby: (stopId: 
       ) : null}
     </section>
   );
+}
+
+// The group's verdict on a stop: 👍 3 · 👎 1 (with the notes on hover).
+function ReviewTally({ stopId }: { stopId: string }) {
+  const rs = live.reviews.filter((r) => r.stopId === stopId);
+  if (!rs.length) return null;
+  const up = rs.filter((r) => r.vote === 1).length, down = rs.length - up;
+  const notes = rs.filter((r) => r.note).map((r) => `${r.vote === 1 ? '👍' : '👎'} ${r.email.split('@')[0]}: ${r.note}`).join('\n');
+  return <span className={`tag review${up >= down ? ' up' : ' down'}`} title={notes || undefined}>{up ? `👍 ${up}` : ''}{up && down ? ' · ' : ''}{down ? `👎 ${down}` : ''}</span>;
 }
