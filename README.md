@@ -7,8 +7,8 @@ track based on your location.
   devices.
 - **Collaborators.** The owner adds people by their Google email. Only members of a trip can
   see or change it, and Firebase's servers enforce that.
-- **Hosting.** It's a static site (plain HTML, CSS and JavaScript, no build step) on GitHub
-  Pages, with Firebase for sign-in and storage, on the free plan.
+- **Hosting.** A React + TypeScript app built with Vite into a static site on GitHub Pages, with
+  Firebase for sign-in and storage, on the free plan.
 
 The Mumbai + Lonavala trip (17–20 Oct 2026) is included as a read-only **sample**. Anyone can
 view it, and signed-in users can copy it into their own trips.
@@ -63,7 +63,7 @@ app's code, so a modified browser can't get around it. The rules are covered by 
    contents of [`firestore.rules`](firestore.rules) → **Publish**.
 6. **Connect the app:** Project settings (⚙) → General → Your apps → **Web** (`</>`) → register
    the app. Copy `apiKey`, `authDomain`, `projectId` and `appId` into
-   [`js/firebase-config.js`](js/firebase-config.js), then commit and push.
+   [`src/lib/firebase-config.ts`](src/lib/firebase-config.ts), then commit and push.
 
 These config values are not secrets. They only identify your project, and the security rules
 decide who can read or write. If you want extra protection, restrict the API key to your
@@ -90,51 +90,45 @@ and 20,000 writes per day, and 1 GB of storage.
 2. On GitHub, go to **Settings → Pages**. Under **Build and deployment**, set **Source** to
    **GitHub Actions**.
 3. Every push to `main` now runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml),
-   which stamps versions and publishes the site. Watch it under the repo's **Actions** tab.
+   which runs the tests, builds the app and publishes `dist/`. Watch it under the repo's **Actions** tab.
    After a minute the site is live at `https://<your-username>.github.io/mumbai-lonavala-trip/`.
 
 ## Versioning and caching
 
 Browsers, GitHub Pages (10-minute cache) and the offline service worker all cache files.
-[`scripts/stamp.mjs`](scripts/stamp.mjs) makes sure nobody runs stale code after a deploy:
+`npm run build` makes sure nobody runs stale code after a deploy:
 
-- **Versioned files:** every JS and CSS file gets a content-hash version, for example
-  `js/live.js?v=5815dfb5f9`. An **import map** in `index.html` applies the versions to module
-  imports too. Only files that changed get a new URL, so unchanged ones stay cached.
-- **App version:** the app version (shown on the Account page) names the offline cache, and old
-  caches are deleted when a new version activates.
-- **Update notice:** `version.json` holds the current version. The open app checks it when you
-  return to it, and every 30 minutes, then shows **"A new version of GoWander is available ·
-  Reload"**.
+- **Hashed files:** Vite names every bundle by its content (`assets/index-3LLnlzqI.js`), so a
+  changed file gets a new URL and unchanged ones stay cached.
+- **App version:** [`scripts/postbuild.mjs`](scripts/postbuild.mjs) hashes the whole build into
+  an app version. It's written into `index.html`, `version.json` and the service worker, which
+  names its offline cache after it and deletes old caches when a new version activates.
+- **Update notice:** the open app checks `version.json` when you return to it, and every 30
+  minutes, then shows **"A new version of GoWander is available · Reload"**.
 
-The deploy workflow runs the stamp automatically. If you deploy another way (for example
-**Deploy from a branch**), run it yourself before committing:
-
-```bash
-npm run stamp
-```
+The release number people see ("GoWander V1.0.1" on the Account page) is `RELEASE` in
+[`src/app/version.ts`](src/app/version.ts); bump it by hand when shipping.
 
 ## Project layout
 
-| File | Purpose |
+| Path | Purpose |
 |---|---|
-| `index.html` | App shell |
-| `js/main.js` | Router, sign-in, trip list, members, account, share and import |
-| `js/cloud.js` | Firebase: Google sign-in and trip storage in Firestore |
-| `js/firebase-config.js` | Your Firebase project config (fill in once) |
-| `js/live.js` | Live status engine, timeline and map for one trip |
-| `js/editor.js` | Trip editor |
-| `js/placepicker.js` | Location picker (search, map, links) |
-| `js/store.js` | Trip validation, sample trips, share links, backup files |
-| `js/util.js` | Shared helpers, including timezone-aware trip clocks |
-| `js/testkit.js` | Test panel (only loaded in test mode) |
-| `data/trips.json` | Sample trips shown to everyone |
+| `index.html` | Page shell, plus a static first paint of the home screen so nothing jumps on load |
+| `src/main.tsx` | Entry: styles, zoom blocking, service worker, update check |
+| `src/App.tsx` | Routes (`#/trip/<id>`, `#/edit/<id>`, …) and the app shell |
+| `src/pages/` | Screens: home, trip (status, timeline, map, nearby), editor and place picker, members, checklist, expenses, account, shared-copy import |
+| `src/components/` | Header, page frame, trip card, icons |
+| `src/app/` | Shared app state (signed-in user, trip list), cover photos, screen transitions, test panel |
+| `src/lib/cloud.ts` | Firebase: Google sign-in and storage in Firestore |
+| `src/lib/firebase-config.ts` | Your Firebase project config (fill in once) |
+| `src/lib/live.ts` | Live status engine for the open trip |
+| `src/lib/` (others) | Trip data and share links, editing rules, calendar export, weather, travel times, nearby places, expenses maths, timezone-aware clocks |
+| `src/styles/` | Stylesheets |
+| `public/` | Copied as-is: sample trips, icons, manifest, service worker |
+| `scripts/postbuild.mjs` | Stamps the app version into the build and the offline file list into `sw.js` |
 | `firestore.rules` | Who can read and write trips |
-| `tests/` | Security rules tests |
-| `sw.js` | Offline support and cache control (versions written by the stamp script) |
-| `version.json` | Current app version, used for the "new version available" notice |
-| `scripts/stamp.mjs` | Cache-busting: stamps content-hash versions on JS/CSS |
-| `.github/workflows/deploy.yml` | Stamps and deploys to GitHub Pages on every push |
+| `tests/` | Security rules tests (`src/**/*.test.ts` are the unit tests) |
+| `.github/workflows/deploy.yml` | Tests, builds and deploys to GitHub Pages on every push to `main` |
 
 ## Local development and testing
 
@@ -150,14 +144,29 @@ npm install
 npm run emulators
 ```
 
-In a second terminal, serve the site:
+In a second terminal, start the dev server:
 
 ```bash
-npm run serve
+npm run dev
 ```
 
-Then open http://localhost:8080/?emulator. The emulator's Google sign-in lets you create fake
+Then open http://localhost:8090/?emulator. The emulator's Google sign-in lets you create fake
 accounts, so you can try owner, collaborator and stranger flows.
+
+**Check the code.** Type-check, run the unit tests, or make a production build (served with
+`npm run preview`):
+
+```bash
+npm run typecheck
+```
+
+```bash
+npm test
+```
+
+```bash
+npm run build
+```
 
 **Test the security rules:**
 
