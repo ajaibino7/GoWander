@@ -6,7 +6,7 @@
   <title>GoWander</title>
   <meta name="description" content="Plan trips day by day and follow them live with location-aware status.">
   <meta name="theme-color" content="#13294b">
-  <meta name="app-version" content="d456e673">
+  <meta name="app-version" content="dev">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/favicon-64.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -14,128 +14,65 @@
   <meta name="apple-mobile-web-app-title" content="GoWander">
   <meta name="application-name" content="GoWander">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
-  <link rel="stylesheet" href="css/styles.css?v=f2e0c79fbe">
-  <link rel="stylesheet" href="css/app.css?v=58151d1c9b">
 </head>
 <body>
-  <div id="sim-banner" class="sim-banner" hidden></div>
-
-  <header class="hero home">
-    <svg class="skyline" viewBox="0 0 800 120" preserveAspectRatio="none" aria-hidden="true">
-      <path fill="rgba(10,22,44,.45)" d="M0 120 V82 H30 V66 H48 V82 H70 V50 H86 V30 H96 V50 H110 V74 H140 V58 H160 V40 H170 V58 H190 V80 H220 V62 h10 V44 l12 -18 l12 18 V62 h10 V80 H290 V54 H312 V70 H340 V34 H352 V14 H362 V34 H374 V68 H400 V82 H430 V60 H460 V42 H470 V60 H500 V76 H530 V56 l18 -26 l18 26 V76 H600 V62 H624 V46 H640 V62 H660 V78 H700 V58 H720 V38 H732 V58 H760 V74 H800 V120 Z"/>
-      <path fill="var(--bg)" d="M0 120 V106 C120 98 220 112 330 104 C450 96 560 114 680 102 C730 98 770 104 800 100 V120 Z"/>
-    </svg>
-    <!-- Home page only: a dawn coastline — far peaks, green hills, the sea, and the page's edge. -->
-    <div class="home-clouds" aria-hidden="true">
-      <svg class="cloud c1" viewBox="0 0 120 50"><path d="M20 44h82a16 16 0 0 0 0-32 22 22 0 0 0-41-6 18 18 0 0 0-31 12A13 13 0 0 0 20 44z"/></svg>
-      <svg class="cloud c2" viewBox="0 0 120 50"><path d="M20 44h82a16 16 0 0 0 0-32 22 22 0 0 0-41-6 18 18 0 0 0-31 12A13 13 0 0 0 20 44z"/></svg>
-      <svg class="cloud c3" viewBox="0 0 120 50"><path d="M20 44h82a16 16 0 0 0 0-32 22 22 0 0 0-41-6 18 18 0 0 0-31 12A13 13 0 0 0 20 44z"/></svg>
-    </div>
-    <svg class="home-scene" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true">
-      <defs>
-        <linearGradient id="hs-far" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--hs-far1)"/><stop offset="1" style="stop-color:var(--hs-far2)"/></linearGradient>
-        <linearGradient id="hs-mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--hs-mid1)"/><stop offset="1" style="stop-color:var(--hs-mid2)"/></linearGradient>
-        <linearGradient id="hs-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--hs-sea1)"/><stop offset="1" style="stop-color:var(--hs-sea2)"/></linearGradient>
-      </defs>
-      <path fill="url(#hs-far)" d="M0 150 C40 140 60 120 100 118 C140 116 150 132 190 128 C240 122 250 80 300 76 C350 72 360 124 410 122 C460 120 480 92 530 90 C575 88 590 118 630 116 C670 114 680 86 720 84 C770 82 780 126 830 124 C880 122 880 80 930 78 C985 76 990 122 1040 120 C1090 118 1100 96 1140 94 C1185 92 1190 130 1240 128 C1290 126 1290 88 1340 86 C1390 84 1400 118 1440 120 V220 H0 Z"/>
-      <path fill="url(#hs-mid)" d="M0 176 C110 150 210 158 320 142 C430 126 520 168 640 156 C760 144 850 122 980 146 C1100 168 1210 138 1320 150 C1380 156 1420 162 1440 160 V220 H0 Z"/>
-      <path fill="url(#hs-sea)" d="M0 188 C240 178 480 194 720 186 C960 178 1200 192 1440 184 V220 H0 Z"/>
-      <path fill="var(--bg)" d="M0 204 C240 196 480 212 720 203 C960 194 1200 210 1440 200 V220 H0 Z"/>
-    </svg>
-    <a class="hero-credit" id="hero-credit" target="_blank" rel="noopener" hidden></a>
-    <div class="hero-inner">
-      <nav class="hero-nav" id="hero-nav" aria-label="Page"></nav>
-      <div class="eyebrow" id="hero-eyebrow"></div>
-      <h1 id="hero-title" data-html='<img class="brand-logo" src="icons/logo.webp" alt="GoWander trip planner" width="900" height="624">'><img class="brand-logo" src="icons/logo.webp" alt="GoWander trip planner" width="900" height="624"></h1>
-      <div class="hero-desc" id="hero-desc">Plan together · Travel smarter · Follow it live</div>
-      <div class="hero-sub" id="hero-sub"></div>
-    </div>
-  </header>
-
-  <main>
-    <section id="view-home" class="view wrap-narrow">
-      <div class="home-skel" aria-hidden="true">
-        <div class="sk-line w40"></div><div class="sk-line w25"></div>
-        <div class="trip-list"><div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div></div>
+  <div id="root">
+    <!-- The very first paint, before the app starts: the home screen (logo header + placeholder
+         cards), so nothing jumps. The app's first render replaces it. -->
+    <header class="hero home">
+      <svg class="skyline" viewBox="0 0 800 120" preserveAspectRatio="none" aria-hidden="true">
+        <path fill="rgba(10,22,44,.45)" d="M0 120 V82 H30 V66 H48 V82 H70 V50 H86 V30 H96 V50 H110 V74 H140 V58 H160 V40 H170 V58 H190 V80 H220 V62 h10 V44 l12 -18 l12 18 V62 h10 V80 H290 V54 H312 V70 H340 V34 H352 V14 H362 V34 H374 V68 H400 V82 H430 V60 H460 V42 H470 V60 H500 V76 H530 V56 l18 -26 l18 26 V76 H600 V62 H624 V46 H640 V62 H660 V78 H700 V58 H720 V38 H732 V58 H760 V74 H800 V120 Z"/>
+        <path fill="var(--bg)" d="M0 120 V106 C120 98 220 112 330 104 C450 96 560 114 680 102 C730 98 770 104 800 100 V120 Z"/>
+      </svg>
+      <!-- Home page only: a dawn coastline — far peaks, green hills, the sea, and the page's edge. -->
+      <div class="home-clouds" aria-hidden="true">
+        <svg class="cloud c1" viewBox="0 0 120 50"><path d="M20 44h82a16 16 0 0 0 0-32 22 22 0 0 0-41-6 18 18 0 0 0-31 12A13 13 0 0 0 20 44z"/></svg>
+        <svg class="cloud c2" viewBox="0 0 120 50"><path d="M20 44h82a16 16 0 0 0 0-32 22 22 0 0 0-41-6 18 18 0 0 0-31 12A13 13 0 0 0 20 44z"/></svg>
+        <svg class="cloud c3" viewBox="0 0 120 50"><path d="M20 44h82a16 16 0 0 0 0-32 22 22 0 0 0-41-6 18 18 0 0 0-31 12A13 13 0 0 0 20 44z"/></svg>
       </div>
-    </section>
+      <svg class="home-scene" viewBox="0 0 1440 220" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="hs-far" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--hs-far1)"/><stop offset="1" style="stop-color:var(--hs-far2)"/></linearGradient>
+          <linearGradient id="hs-mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--hs-mid1)"/><stop offset="1" style="stop-color:var(--hs-mid2)"/></linearGradient>
+          <linearGradient id="hs-sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--hs-sea1)"/><stop offset="1" style="stop-color:var(--hs-sea2)"/></linearGradient>
+        </defs>
+        <path fill="url(#hs-far)" d="M0 150 C40 140 60 120 100 118 C140 116 150 132 190 128 C240 122 250 80 300 76 C350 72 360 124 410 122 C460 120 480 92 530 90 C575 88 590 118 630 116 C670 114 680 86 720 84 C770 82 780 126 830 124 C880 122 880 80 930 78 C985 76 990 122 1040 120 C1090 118 1100 96 1140 94 C1185 92 1190 130 1240 128 C1290 126 1290 88 1340 86 C1390 84 1400 118 1440 120 V220 H0 Z"/>
+        <path fill="url(#hs-mid)" d="M0 176 C110 150 210 158 320 142 C430 126 520 168 640 156 C760 144 850 122 980 146 C1100 168 1210 138 1320 150 C1380 156 1420 162 1440 160 V220 H0 Z"/>
+        <path fill="url(#hs-sea)" d="M0 188 C240 178 480 194 720 186 C960 178 1200 192 1440 184 V220 H0 Z"/>
+        <path fill="var(--bg)" d="M0 204 C240 196 480 212 720 203 C960 194 1200 210 1440 200 V220 H0 Z"/>
+      </svg>
+      <a class="hero-credit" target="_blank" rel="noopener" hidden></a>
+      <div class="hero-inner">
+        <nav class="hero-nav" aria-label="Page"></nav>
+        <div class="eyebrow"></div>
+        <h1 id="hero-title"><img class="brand-logo" src="icons/logo.webp" alt="GoWander trip planner" width="900" height="624"></h1>
+        <div class="hero-desc" id="hero-desc">Plan together · Travel smarter · Follow it live</div>
+        <div class="hero-sub"></div>
+      </div>
+    </header>
+    <main>
+      <section id="view-home" class="view wrap-narrow">
+        <div class="home-skel" aria-hidden="true">
+          <div class="sk-line w40"></div><div class="sk-line w25"></div>
+          <div class="trip-list"><div class="sk-card"></div><div class="sk-card"></div><div class="sk-card"></div></div>
+        </div>
+      </section>
+    </main>
     <script>
-      // The very first paint shows the home screen (logo header + placeholder cards) so nothing
-      // jumps when the app starts. A link straight to a trip or another page gets a plain header.
+      // A link straight to a trip or another page gets a plain header instead.
       (function () {
-        if (/^#?\/?$/.test(location.hash)) return;
-        document.querySelector('.hero').classList.remove('home');
-        var t = document.getElementById('hero-title');
-        t.textContent = '';
-        t.removeAttribute('data-html');
-        document.getElementById('hero-desc').hidden = true;
-        document.getElementById('view-home').hidden = true;
+        if (!/^#?\/?$/.test(location.hash)) {
+          document.querySelector('.hero').classList.remove('home');
+          document.querySelector('.hero h1').textContent = '';
+          document.querySelector('.hero-desc').hidden = true;
+          document.getElementById('view-home').hidden = true;
+          return;
+        }
+        // Tells the app its first header doesn't need to play the logo's entrance again.
+        document.documentElement.dataset.staticPaint = 'home';
       })();
     </script>
-
-    <div id="view-trip" class="view wrap" hidden>
-      <div class="col-main">
-        <section class="status-card" id="status" aria-live="polite">
-          <div class="status-top">
-            <span class="pill" id="status-pill">Loading…</span>
-            <button class="loc-btn" id="loc-btn" type="button">
-              <span class="loc-dot" id="loc-dot"></span><span id="loc-label">Use my location</span>
-            </button>
-          </div>
-          <div id="status-body"></div>
-        </section>
-        <nav class="trip-tools" id="trip-tools" aria-label="Trip tools"></nav>
-        <nav class="tabs" id="tabs" role="tablist" aria-label="Trip days"></nav>
-        <section class="day" id="day"></section>
-      </div>
-      <aside class="col-map">
-        <div class="map-card">
-          <div id="map" role="region" aria-label="Map of the day's stops"></div>
-          <div class="map-foot">
-            <button type="button" class="link-btn" id="fit-btn">Show all stops</button>
-            <button type="button" class="link-btn" id="me-btn" disabled>Centre on me</button>
-          </div>
-          <div class="nearby" id="nearby" hidden></div>
-        </div>
-      </aside>
-    </div>
-
-    <section id="view-edit" class="view wrap-narrow" hidden></section>
-    <section id="view-members" class="view wrap-narrow" hidden></section>
-    <section id="view-settings" class="view wrap-narrow" hidden></section>
-    <section id="view-import" class="view wrap-narrow" hidden></section>
-    <section id="view-checklist" class="view wrap-narrow" hidden></section>
-    <section id="view-expenses" class="view wrap-narrow" hidden></section>
-  </main>
-
-  <footer class="site-foot" id="site-foot"></footer>
-  <div id="modal" class="modal" hidden></div>
-
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <!-- build:importmap -->
-  <script type="importmap">
-  {
-    "imports": {
-      "./js/autocover.js": "./js/autocover.js?v=8afe28294f",
-      "./js/calendar.js": "./js/calendar.js?v=0309c30dc1",
-      "./js/cloud.js": "./js/cloud.js?v=007f8bcbfe",
-      "./js/editor.js": "./js/editor.js?v=89f195aa91",
-      "./js/firebase-config.js": "./js/firebase-config.js?v=caeca71f59",
-      "./js/live.js": "./js/live.js?v=33d55cb787",
-      "./js/main.js": "./js/main.js?v=965d726ab6",
-      "./js/nearby.js": "./js/nearby.js?v=8656ebc47c",
-      "./js/offline.js": "./js/offline.js?v=73a89c5e7d",
-      "./js/placepicker.js": "./js/placepicker.js?v=3594d48934",
-      "./js/routing.js": "./js/routing.js?v=165c00c8ee",
-      "./js/store.js": "./js/store.js?v=085676b855",
-      "./js/testkit.js": "./js/testkit.js?v=cd1f1e95d1",
-      "./js/util.js": "./js/util.js?v=80527bd589",
-      "./js/weather.js": "./js/weather.js?v=f3ec1a4ad6"
-    }
-  }
-  </script>
-  <!-- /build:importmap -->
-  <script type="module" src="js/main.js?v=965d726ab6"></script>
+  </div>
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

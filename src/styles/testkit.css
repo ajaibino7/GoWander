@@ -1,0 +1,32 @@
+/* Test panel (?test) — loaded only in test mode. */
+.tk-fab { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 1000;
+  background: #6b3fa0; color: #fff; border: 0; border-radius: 999px; padding: 10px 16px; font-weight: 700;
+  box-shadow: 0 4px 16px rgba(0,0,0,.3); cursor: pointer; }
+.tk { position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 1000; width: 340px;
+  max-width: calc(100vw - 32px); max-height: min(78vh, 680px); overflow: auto; background: var(--surface);
+  color: var(--ink); border: 2px solid #6b3fa0; border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.35); font-size: 13px; }
+.tk-h { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; padding: 10px 12px;
+  background: #6b3fa0; color: #fff; font-weight: 700; z-index: 1; }
+.tk-h button { background: none; border: 0; color: #fff; font-size: 18px; cursor: pointer; line-height: 1; }
+.tk-s { padding: 10px 12px; border-bottom: 1px solid var(--line); display: grid; gap: 8px; }
+.tk-s:last-child { border-bottom: 0; }
+.tk-l { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.tk-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.tk input, .tk select { font: inherit; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px 8px; min-width: 0; flex: 1; }
+.tk button.b { font: inherit; background: var(--surface-2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 8px; padding: 5px 9px; cursor: pointer; }
+.tk button.b:hover { border-color: #6b3fa0; }
+.tk button.b.on { background: #6b3fa0; color: #fff; border-color: #6b3fa0; }
+.tk button.b.primary { background: #6b3fa0; color: #fff; border-color: #6b3fa0; font-weight: 700; }
+.tk-clock { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tk-list { display: grid; gap: 4px; }
+.tk-sc { display: grid; grid-template-columns: 18px 1fr auto; gap: 6px; align-items: center; text-align: left;
+  font: inherit; color: var(--ink); background: none; border: 1px solid transparent; border-radius: 8px; padding: 5px 6px; cursor: pointer; }
+.tk-sc:hover { background: var(--surface-2); border-color: var(--line); }
+.tk-sc .r { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.tk-sc .pass { color: var(--ok); font-weight: 700; }
+.tk-sc .fail { color: var(--bad); font-weight: 700; }
+.tk-sum { font-weight: 700; }
+.tk-hint { color: var(--muted); font-size: 12px; }
+.tk-pick { cursor: crosshair !important; }
