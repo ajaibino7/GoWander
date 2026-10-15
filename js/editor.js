@@ -126,6 +126,11 @@ export function mountEditor(el, trip, opts) {
   opts.autoP?.then((info) => { auto = info || null; renderCover(); });
 
   const tzToday = () => makeClock(draft.timezone || DEFAULT_TZ).dateKey(new Date());
+  // Trip days can't be set in the past ("today" in the trip's timezone). Dates the trip already had
+  // stay allowed, so a trip in progress or a finished one can still be edited and saved.
+  const savedDates = new Set(trip.days.map((d) => d.date).filter(Boolean));
+  const pastNotAllowed = (date) => !!date && date < tzToday() && !savedDates.has(date);
+  const minDate = (date) => (date && date < tzToday() && savedDates.has(date) ? date : tzToday());
 
   function stopHtml(s, i, j, stopsLen) {
     const p = `days.${i}.stops.${j}`;
@@ -182,7 +187,7 @@ export function mountEditor(el, trip, opts) {
           <button type="button" class="icon-btn" data-a="del-day" data-d="${i}" title="Remove day" aria-label="Remove day ${i + 1}">✕</button>
         </div>
         <div class="grid2">
-          <label class="fld"><span>Date</span><input type="date" data-f="days.${i}.date" value="${esc(d.date)}" required></label>
+          <label class="fld"><span>Date</span><input type="date" data-f="days.${i}.date" value="${esc(d.date)}" min="${minDate(d.date)}" required></label>
           <label class="fld"><span>Day title</span><input data-f="days.${i}.title" value="${esc(d.title)}" maxlength="160" placeholder="e.g. North Goa beaches"></label>
         </div>
         <div class="ed-stops">${d.stops.map((s, j) => stopHtml(s, i, j, d.stops.length)).join('') || '<div class="muted small">No stops yet.</div>'}</div>
@@ -237,6 +242,7 @@ export function mountEditor(el, trip, opts) {
     const seen = new Set();
     draft.days.forEach((d, i) => {
       if (!d.date) errors.push(`Day ${i + 1}: choose a date.`);
+      else if (pastNotAllowed(d.date)) errors.push(`Day ${i + 1}: ${d.date} has already passed. Pick today or a later date.`);
       else if (seen.has(d.date)) errors.push(`Day ${i + 1}: ${d.date} is used by another day.`);
       seen.add(d.date);
       d.stops.forEach((s, j) => {
@@ -340,8 +346,10 @@ export function mountEditor(el, trip, opts) {
     const i = Number(b.dataset.d), j = Number(b.dataset.s);
     switch (b.dataset.a) {
       case 'add-day': {
+        // The day after the last one — or today, if that would be in the past.
         const last = draft.days[draft.days.length - 1];
-        draft.days.push({ date: last?.date ? addDays(last.date, 1) : tzToday(), title: '', stops: [], notes: [] });
+        const next = last?.date ? addDays(last.date, 1) : tzToday();
+        draft.days.push({ date: next < tzToday() ? tzToday() : next, title: '', stops: [], notes: [] });
         break;
       }
       case 'del-day':
