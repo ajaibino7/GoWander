@@ -420,7 +420,6 @@ html { -webkit-tap-highlight-color: transparent; }
 }
 .trip-card { transition: transform .4s var(--spring), box-shadow .4s var(--spring); }
 .trip-card:active { transform: scale(.98); transition-duration: .12s; }
-.tl { transition: background-color .25s; }
 .tl:active { background: var(--surface-2); }
 
 /* Opening a stop eases its buttons in; the nearby panel and expanded content slide up softly. */
@@ -454,6 +453,39 @@ html { -webkit-tap-highlight-color: transparent; }
 
 /* Numbers and bars that change glide instead of jumping. */
 .cl-bar span, .progress span { transition: width .6s var(--spring); }
+
+/* Photos fade in once loaded (and settle from a slight zoom) instead of popping in. */
+.fade-img { opacity: 0; transform: scale(1.04); transition: opacity .6s ease, transform 1.2s var(--spring); }
+.fade-img.on { opacity: 1; transform: none; }
+.fade-img.instant { transition: none; }
+.tc-banner { overflow: hidden; }
+.tc-banner > .tc-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+/* Hovering a trip card drifts its photo closer. */
+.trip-card:hover .tc-photo.on { transform: scale(1.05); transition: transform 1.2s var(--spring); }
+
+/* Things that arrive a moment later — weather, travel times, "done by", the map — fade in
+   rather than appearing with a jolt. */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.tw, .day-wx, .m-wx, .done-by, .hero-who { animation: fade-in .5s ease both; }
+.hero-pill { animation: fade-up .6s var(--spring) .1s both; }
+.leaflet-container { animation: fade-in .5s ease both; }
+
+/* The status pill pops when the trip's state changes (on track → running behind, …). */
+@keyframes pill-in { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
+.status-card .pill { animation: pill-in .5s var(--spring-pop) both; }
+
+/* Ticking off a stop: it eases to faded, its dot fills in with a little bounce. */
+.tl { transition: background-color .25s, opacity .4s ease; }
+.tl .d { transition: background-color .3s, border-color .3s, transform .4s var(--spring-pop); }
+
+/* Live lists: an item someone adds slides in; a removed one slides away before it goes. */
+@keyframes item-in { from { opacity: 0; transform: translate3d(0, -6px, 0) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes item-out { to { opacity: 0; transform: translate3d(24px, 0, 0); } }
+.fresh { animation: item-in .45s var(--spring) both; }
+.leaving { animation: item-out .22s ease forwards; pointer-events: none; }
+
+/* Nearby places ripple in, one after another (index set as --i). */
+.nb-list > li { animation: fade-up .45s var(--spring) both; animation-delay: calc(var(--i, 0) * 30ms); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

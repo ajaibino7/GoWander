@@ -2,6 +2,8 @@
 // bundled sample trips.
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import * as cloud from '../lib/cloud';
+import { bootSnapshot, saveBoot, type BootSnapshot } from './bootCache';
+import { autoCoversFor, onCoversChange } from './covers';
 import { loadSamples } from '../lib/store';
 import { toast } from '../lib/toast';
 import type { Trip, TripEntry, User } from '../lib/types';
@@ -15,6 +17,14 @@ export interface AppDataValue {
   myTrips: TripEntry[];
   /** The first trip list arrived (until then the home page shows placeholders). */
   myTripsLoaded: boolean;
+  /**
+   * Last visit's home screen, while Firebase is still confirming the sign-in or fetching that
+   * person's trips: lets screens draw real content straight away. null once live data is in
+   * (or if it's for someone else).
+   */
+  cached: BootSnapshot | null;
+  /** Who to show as signed in: the real user, or (while Firebase starts) last visit's. */
+  shownUser: User | null;
 }
 
 const Ctx = createContext<AppDataValue | null>(null);
@@ -32,6 +42,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [samplesReady, setSamplesReady] = useState(false);
   const [myTrips, setMyTrips] = useState<TripEntry[]>([]);
   const [myTripsLoaded, setMyTripsLoaded] = useState(false);
+  const [boot] = useState(bootSnapshot);
 
   useEffect(() => {
     loadSamples().then((s) => { setSamples(s); setSamplesReady(true); });
@@ -60,8 +71,29 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     return () => { cancelled = true; off?.(); };
   }, [user]);
 
+  // Keep the snapshot for next time up to date (trips and their photos), a moment after changes.
+  useEffect(() => {
+    if (!authReady) return undefined;
+    if (!user) { saveBoot(null, [], {}); return undefined; }
+    if (!myTripsLoaded) return undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const save = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => saveBoot(user, myTrips, autoCoversFor(myTrips.map((e) => e.trip.id))), 400);
+    };
+    save();
+    const off = onCoversChange(save);
+    return () => { off(); clearTimeout(timer); };
+  }, [authReady, user, myTrips, myTripsLoaded]);
+
+  const cached = !boot ? null
+    : !authReady ? boot
+    : user && !myTripsLoaded && boot.user?.uid === user.uid ? boot
+    : null;
+  const shownUser = user ?? (authReady ? null : boot?.user ?? null);
+
   return (
-    <Ctx.Provider value={{ user, authReady, samples, samplesReady, myTrips, myTripsLoaded }}>
+    <Ctx.Provider value={{ user, authReady, samples, samplesReady, myTrips, myTripsLoaded, cached, shownUser }}>
       {children}
     </Ctx.Provider>
   );

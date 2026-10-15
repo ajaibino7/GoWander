@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAppData } from '../app/AppData';
-import { useReveal } from '../app/motion';
+import { useLeaving, useNewItems, useReveal } from '../app/motion';
 import { nameOf, useTripWatch } from '../app/useTripWatch';
 import { BackLink } from '../components/Hero';
 import { Page, PageLoading } from '../components/Page';
@@ -54,11 +54,14 @@ export function ExpensesPage() {
   }, [members.join()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useReveal(ref, '.ex-row, .ex-bal li, .ex-moves li', !!expenses);
+  // Expenses someone adds slide in; deleted ones slide away.
+  const isNew = useNewItems(expenses ? expenses.map((x) => x.id) : null);
+  const [leaving, leave] = useLeaving();
 
-  if (!authReady) return <PageLoading viewId="view-expenses" eyebrow="Expenses" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} />;
+  if (!authReady) return <PageLoading viewId="view-expenses" eyebrow="Expenses" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} tripId={id} />;
   if (!user) return <HomePage message="Sign in with Google to open this trip." />;
   if (denied) return <JoinTrip id={id} onJoined={retry} />;
-  if (!entry || !form) return <PageLoading viewId="view-expenses" eyebrow="Expenses" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} />;
+  if (!entry || !form) return <PageLoading viewId="view-expenses" eyebrow="Expenses" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} tripId={id} />;
 
   const list = expenses || [];
   const by = balances(list);
@@ -191,7 +194,7 @@ export function ExpensesPage() {
           <h2 className="sec-h">All expenses</h2>
           <ul className="ex-list">
             {rows.length ? rows.map((x) => (
-              <li key={x.id} className={`ex-row${x.kind === 'settlement' ? ' settle' : ''}`}>
+              <li key={x.id} className={`ex-row${x.kind === 'settlement' ? ' settle' : ''}${isNew(x.id) ? ' fresh' : ''}${leaving.has(x.id) ? ' leaving' : ''}`}>
                 <span className="ex-ic" aria-hidden="true">{x.kind === 'settlement' ? '🤝' : '🧾'}</span>
                 <span className="ex-main">
                   <span className="ex-title">{x.title}</span>
@@ -211,7 +214,7 @@ export function ExpensesPage() {
                   <button className="icon-btn" type="button" title="Delete" aria-label={`Delete ${x.title}`} onClick={async () => {
                     if (!(await ask(`Delete “${x.title}”?`, { detail: 'Balances update for everyone.', ok: 'Delete', danger: true }))) return;
                     if (editing === x.id) resetForm();
-                    try { await cloud.deleteListItem(id, 'expenses', x.id); } catch (err) { toast((err as Error).message, 'bad'); }
+                    await leave(x.id, () => cloud.deleteListItem(id, 'expenses', x.id).catch((err: Error) => toast(err.message, 'bad')));
                   }}>✕</button>
                 </span>
               </li>

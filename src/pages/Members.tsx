@@ -37,10 +37,10 @@ export function MembersPage() {
   const ref = useRef<HTMLDivElement>(null);
   useReveal(ref, '.members > li', !!entry);
 
-  if (!authReady) return <PageLoading viewId="view-members" eyebrow="Trip members" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} />;
+  if (!authReady) return <PageLoading viewId="view-members" eyebrow="Trip members" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} tripId={id} />;
   if (!user) return <HomePage message="Sign in to manage trip members." />;
   if (denied) return <JoinTrip id={id} onJoined={retry} />;
-  if (!entry) return <PageLoading viewId="view-members" eyebrow="Trip members" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} />;
+  if (!entry) return <PageLoading viewId="view-members" eyebrow="Trip members" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} tripId={id} />;
 
   const { trip, meta } = entry;
   const owner = meta.ownerUid === user.uid;

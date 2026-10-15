@@ -95,16 +95,20 @@ button { font: inherit; color: inherit; }
   overflow: hidden;
 }
 .hero .skyline { position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: 70px; }
-/* A trip's cover photo replaces the default sunset artwork. The shading keeps white text readable
-   on any photo; the skyline silhouette is dropped but the curved edge stays. */
-.hero.has-cover {
-  background:
-    linear-gradient(180deg, rgba(8, 18, 36, .62) 0%, rgba(8, 18, 36, .32) 45%, rgba(8, 18, 36, .72) 100%),
-    var(--cover) center / cover no-repeat,
-    #0f2240;
-  padding-bottom: 88px;
+/* A trip's cover photo fades in over the default sunset artwork once it has loaded (and settles
+   from a slight zoom). The shading keeps white text readable on any photo; the skyline silhouette
+   fades out but the curved edge stays. Trip headers are tall enough for a photo from the start,
+   so nothing below moves when one arrives. */
+.hero.trip { padding-bottom: 88px; }
+.hero-photo {
+  position: absolute; inset: 0; background: center / cover no-repeat;
+  opacity: 0; transform: scale(1.06); transition: opacity .8s ease, transform 1.6s cubic-bezier(.32, .72, 0, 1);
 }
-.hero.has-cover .skyline path:first-child { display: none; }
+.hero-photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 18, 36, .62) 0%, rgba(8, 18, 36, .32) 45%, rgba(8, 18, 36, .72) 100%); }
+.hero-photo.on { opacity: 1; transform: none; }
+.hero-photo.instant { transition: none; }
+.hero .skyline path:first-child { transition: opacity .6s ease; }
+.hero.photo-on .skyline path:first-child { opacity: 0; }
 .hero.has-cover h1, .hero.has-cover .hero-sub, .hero.has-cover .hero-desc { text-shadow: 0 1px 8px rgba(0, 0, 0, .45); }
 /* ---------- Home header: a dawn coastline ----------
    The logo is drawn for light backgrounds, so the home page gets a light morning sky

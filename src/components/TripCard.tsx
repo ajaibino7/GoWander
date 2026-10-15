@@ -7,6 +7,7 @@ import { THEMES, fmtRange } from '../lib/util';
 import { tripStatus } from '../lib/tripStatus';
 import { cardCover, useCovers } from '../app/covers';
 import { Avatars, Icon } from './Icons';
+import { FadeImg } from './FadeImg';
 
 interface Props {
   trip: Trip;
@@ -28,7 +29,8 @@ export function TripCard({ trip, index, badges, actions, members = [] }: Props) 
   return (
     <article className={`trip-card theme-${THEMES[index % THEMES.length]}`}>
       <Link className="tc-main" to={`/trip/${encodeURIComponent(trip.id)}`}>
-        <div className={`tc-banner${cover ? ' has-cover' : ''}`} style={cover ? { backgroundImage: `url("${cover.url}")` } : undefined} title={cover?.title}>
+        <div className={`tc-banner${cover ? ' has-cover' : ''}`} title={cover?.title}>
+          {cover ? <FadeImg key={cover.url} className="tc-photo" src={cover.url} /> : null}
           <svg className="tc-route" viewBox="0 0 300 110" preserveAspectRatio="none" aria-hidden="true">
             <path d="M18 92 C 80 92, 90 40, 150 50 S 230 18, 282 20" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth="2" strokeDasharray="5 6" />
             <circle cx="18" cy="92" r="4" fill="rgba(255,255,255,.8)" /><circle cx="150" cy="50" r="3" fill="rgba(255,255,255,.7)" />

@@ -28,9 +28,9 @@ export function Page({ hero, foot = '', viewId, layout = 'wrap-narrow', children
 }
 
 /** A placeholder screen while a trip loads (the header and a skeleton card, no blank flash). */
-export function PageLoading({ viewId, eyebrow = 'GoWander', back }: { viewId: string; eyebrow?: string; back?: ReactNode }) {
+export function PageLoading({ viewId, eyebrow = 'GoWander', back, tripId = null }: { viewId: string; eyebrow?: string; back?: ReactNode; tripId?: string | null }) {
   return (
-    <Page viewId={viewId} hero={{ eyebrow, title: '', nav: back }}>
+    <Page viewId={viewId} hero={{ eyebrow, title: '', nav: back, tripId }}>
       <div className="home-skel" aria-hidden="true"><div className="sk-card" /></div>
     </Page>
   );

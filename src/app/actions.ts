@@ -1,6 +1,7 @@
 // Actions used from several screens: copying the sample, importing files, sharing links, signing out.
 import * as cloud from '../lib/cloud';
 import * as store from '../lib/store';
+import { clearBoot } from './bootCache';
 import { ask, toast, toastLink } from '../lib/toast';
 import type { Trip, User } from '../lib/types';
 
@@ -43,11 +44,13 @@ export async function shareCopy(trip: Trip): Promise<void> {
 export async function signOutAndReload(): Promise<void> {
   if (!(await ask('Sign out of GoWander?', { detail: 'Your trips stay safe in your account. The offline copy on this device is removed.', ok: 'Sign out' }))) return;
   await cloud.signOutUser();
+  clearBoot();
   location.replace(`${location.pathname}${location.search}#/`);
   location.reload();
 }
 
 export async function switchAccount(): Promise<void> {
   await cloud.signOutUser();
+  clearBoot();
   location.reload();
 }

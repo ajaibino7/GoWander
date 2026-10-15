@@ -67,8 +67,9 @@ function Samples({ samples, signedIn }: { samples: Trip[]; signedIn: boolean }) 
             trip={t}
             index={i + 1}
             badges={<span className="badge local">Sample · read-only</span>}
-            actions={signedIn && user ? (
+            actions={signedIn ? (
               <button className="mini" type="button" disabled={busy} onClick={async () => {
+                if (!user) return; // Firebase is still starting
                 setBusy(true);
                 const id = await copyTrip(user, t);
                 setBusy(false);
@@ -83,13 +84,17 @@ function Samples({ samples, signedIn }: { samples: Trip[]; signedIn: boolean }) 
 }
 
 export function HomePage({ message = '' }: { message?: string }) {
-  const { user, authReady, samples, samplesReady, myTrips, myTripsLoaded } = useAppData();
+  const { user, authReady, samples, samplesReady, myTrips, myTripsLoaded, cached, shownUser } = useAppData();
   const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const rows = user ? myTrips.map((e) => ({ ...e, st: tripStatus(e.trip) })).sort(byStatus) : [];
-  const loading = !authReady || (!!user && !myTripsLoaded);
+  // Until Firebase has confirmed the sign-in and sent the list, last visit's trips stand in
+  // (so the first frame shows real cards, not placeholders).
+  const me = shownUser;
+  const list = myTripsLoaded ? myTrips : cached?.trips ?? [];
+  const rows = me ? list.map((e) => ({ ...e, st: tripStatus(e.trip) })).sort(byStatus) : [];
+  const loading = !cached && (!authReady || (!!user && !myTripsLoaded));
 
   // Jump into a trip that's live right now (or the sample, in test mode) when the app opens on home.
   useEffect(() => {
@@ -107,8 +112,8 @@ export function HomePage({ message = '' }: { message?: string }) {
 
   // Destination photos for the cards; looked up once per place, then remembered.
   useEffect(() => {
-    for (const t of [...rows.map((r) => r.trip), ...samples]) ensureAutoCover(t);
-  }, [myTrips, samples]); // eslint-disable-line react-hooks/exhaustive-deps
+    for (const t of [...myTrips.map((e) => e.trip), ...samples]) ensureAutoCover(t);
+  }, [myTrips, samples]);
 
   useReveal(listRef, '.trip-list > .trip-card, .empty', !loading);
 
@@ -122,7 +127,7 @@ export function HomePage({ message = '' }: { message?: string }) {
           <span className="hp-v">{focus.trip.title}{focus.st.key === 'soon' ? ` · ${focus.st.label.toLowerCase()}` : ''}</span><span aria-hidden="true">→</span>
         </Link>
       ) : null}
-      {user ? <div className="hero-who">Signed in as {user.email}</div> : null}
+      {me ? <div className="hero-who">Signed in as {me.email}</div> : null}
     </>
   );
 
@@ -133,7 +138,7 @@ export function HomePage({ message = '' }: { message?: string }) {
   let body;
   if (loading) {
     body = <HomeSkeleton />;
-  } else if (!user) {
+  } else if (!me) {
     body = <><SignInCard message={message} /><Samples samples={samples} signedIn={false} /></>;
   } else {
     body = (
@@ -150,8 +155,8 @@ export function HomePage({ message = '' }: { message?: string }) {
         </div>
         <div className="trip-list">
           {rows.length ? rows.map(({ trip, meta }, i) => {
-            const owner = meta.ownerUid === user.uid;
-            const canEdit = canEditTrip(meta, user);
+            const owner = meta.ownerUid === me.uid;
+            const canEdit = canEditTrip(meta, me);
             return (
               <TripCard
                 key={trip.id}
@@ -187,7 +192,7 @@ export function HomePage({ message = '' }: { message?: string }) {
           onChange={async (e) => {
             const file = e.target.files?.[0];
             e.target.value = '';
-            if (file) await importFile(user, file);
+            if (file && user) await importFile(user, file);
           }}
         />
       </>

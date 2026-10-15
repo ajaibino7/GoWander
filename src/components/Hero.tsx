@@ -6,6 +6,7 @@ import { heroCover, useCovers } from '../app/covers';
 import { useAppData } from '../app/AppData';
 import * as cloud from '../lib/cloud';
 import { toast } from '../lib/toast';
+import { useImageReady } from './FadeImg';
 
 export interface HeroProps {
   eyebrow?: string;
@@ -40,9 +41,13 @@ export function Hero({ eyebrow = 'GoWander', title = 'Trips', logo = false, desc
   useEffect(() => { staticLogoShown = false; }, []);
   useEffect(() => { document.title = !title || title === 'Trips' || logo ? 'GoWander' : `${title} · GoWander`; }, [title, logo]);
 
-  const classes = ['hero', logo ? 'home' : '', url ? 'has-cover' : ''].filter(Boolean).join(' ');
+  // The photo fades in over the sunset artwork once it has loaded.
+  const photo = useImageReady(url);
+  // Trip headers are tall enough for a photo from the start, so nothing below moves when it arrives.
+  const classes = ['hero', logo ? 'home' : '', tripId ? 'trip' : '', url ? 'has-cover' : '', photo ? 'photo-on' : ''].filter(Boolean).join(' ');
   return (
-    <header className={classes} style={url ? ({ '--cover': `url("${url}")` } as React.CSSProperties) : undefined}>
+    <header className={classes}>
+      {url ? <div key={url} className={`hero-photo ${photo}`.trim()} style={{ backgroundImage: `url("${url}")` }} aria-hidden="true" /> : null}
       <svg className="skyline" viewBox="0 0 800 120" preserveAspectRatio="none" aria-hidden="true">
         <path fill="rgba(10,22,44,.45)" d="M0 120 V82 H30 V66 H48 V82 H70 V50 H86 V30 H96 V50 H110 V74 H140 V58 H160 V40 H170 V58 H190 V80 H220 V62 h10 V44 l12 -18 l12 18 V62 h10 V80 H290 V54 H312 V70 H340 V34 H352 V14 H362 V34 H374 V68 H400 V82 H430 V60 H460 V42 H470 V60 H500 V76 H530 V56 l18 -26 l18 26 V76 H600 V62 H624 V46 H640 V62 H660 V78 H700 V58 H720 V38 H732 V58 H760 V74 H800 V120 Z" />
         <path fill="var(--bg)" d="M0 120 V106 C120 98 220 112 330 104 C450 96 560 114 680 102 C730 98 770 104 800 100 V120 Z" />
@@ -95,7 +100,9 @@ export async function signInWithToast(): Promise<void> {
 
 /** Account (with your photo) when signed in, else a Sign in button. */
 export function AccountChip() {
-  const { user } = useAppData();
+  // shownUser: while Firebase starts, last visit's account (so the button doesn't flip from
+  // "Sign in" to "Account" a moment after the page opens).
+  const { shownUser: user } = useAppData();
   if (user) {
     return (
       <Link className="hn-btn" to="/account" title={user.email}>

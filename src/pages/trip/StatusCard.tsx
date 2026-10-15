@@ -106,7 +106,7 @@ export function StatusCard({ onNearby }: { onNearby: (stopId: string) => void })
   return (
     <section className="status-card" id="status" aria-live="polite">
       <div className="status-top">
-        <PillBadge pill={pill} liveDot={livePill} />
+        <PillBadge key={pill.cls || 'info'} pill={pill} liveDot={livePill} />
         {locBtn}
       </div>
       <div>{body}</div>

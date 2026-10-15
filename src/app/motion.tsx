@@ -69,3 +69,34 @@ export function useReveal(ref: React.RefObject<HTMLElement>, selector: string, r
     ));
   });
 }
+
+/**
+ * For live lists (checklist, expenses): which items arrived after the list first appeared, so
+ * just those can slide in. The first batch is left to useReveal.
+ */
+export function useNewItems(ids: string[] | null): (id: string) => boolean {
+  const known = useRef<Set<string> | null>(null);
+  const fresh = useRef(new Set<string>());
+  if (ids) {
+    if (!known.current) known.current = new Set(ids);
+    else for (const id of ids) if (!known.current.has(id)) { known.current.add(id); fresh.current.add(id); }
+  }
+  return (id) => fresh.current.has(id);
+}
+
+/**
+ * Removing an item from a list: it slides away first, then `remove` runs. Returns the ids on
+ * their way out (give them the 'leaving' class) and the function that starts it.
+ */
+export function useLeaving(): [Set<string>, (id: string, remove: () => Promise<unknown>) => Promise<void>] {
+  const [leaving, setLeaving] = useState<Set<string>>(() => new Set());
+  const start = async (id: string, remove: () => Promise<unknown>) => {
+    setLeaving((s) => new Set(s).add(id));
+    await new Promise((r) => setTimeout(r, prefersReducedMotion() ? 0 : 220));
+    try { await remove(); } finally {
+      // Gone from the list now (or it failed and stays): either way it's no longer leaving.
+      setLeaving((s) => { const n = new Set(s); n.delete(id); return n; });
+    }
+  };
+  return [leaving, start];
+}

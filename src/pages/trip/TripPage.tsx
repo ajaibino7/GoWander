@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAppData } from '../../app/AppData';
 import { ensureAutoCover, useUploadedCover } from '../../app/covers';
+import { useReveal } from '../../app/motion';
 import { copyTrip } from '../../app/actions';
 import { AccountChip, BackLink } from '../../components/Hero';
 import { Page } from '../../components/Page';
@@ -38,7 +39,10 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
   const { user } = useAppData();
   const navigate = useNavigate();
   const [copying, setCopying] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
   useLive();
+  // Opening a trip: the status card, tools and the day's stops rise in one after another.
+  useReveal(wrap, '.status-card, .trip-tools, .tabs, .day-band, .timeline > li');
 
   // Start the live engine for this trip before the first paint; a new version of the same trip
   // (another member's edit) keeps your place in the page.
@@ -109,6 +113,7 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
     >
       {/* Map popups are Leaflet HTML: their "What to do nearby" buttons are handled here. */}
       <div
+        ref={wrap}
         style={{ display: 'contents' }}
         onClick={(e) => {
           const b = (e.target as HTMLElement).closest<HTMLElement>('.leaflet-popup [data-nearby]');
@@ -141,7 +146,7 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
 /** #/trip/:id — a sample, one of your trips, or the join screen. */
 export function TripPage() {
   const { id = '' } = useParams();
-  const { user, authReady, samples, samplesReady } = useAppData();
+  const { user, authReady, samples, samplesReady, myTrips, cached } = useAppData();
   const navigate = useNavigate();
   const [entry, setEntry] = useState<TripEntry | null>(null);
   const [denied, setDenied] = useState(false);
@@ -157,6 +162,7 @@ export function TripPage() {
   const [onDone] = useState(() => (stopId: string, on: boolean) => {
     const u = userRef.current;
     if (u) cloud.setStopDone(u, id, stopId, on).catch((e: Error) => toast(e.message, 'bad'));
+    else toast('Still connecting. Try that again in a moment.', 'info');
   });
 
   useEffect(() => {
@@ -186,17 +192,24 @@ export function TripPage() {
     return () => { cancelled = true; offs.forEach((u) => u()); };
   }, [id, shared, user, navigate, attempt]);
 
+  // Until the trip's own live connection answers, show it from what the app already has: the
+  // trip list (opening it from home) or last visit's snapshot (opening the app) — no placeholder.
+  const known = denied ? undefined : myTrips.find((e) => e.trip.id === id) ?? cached?.trips.find((e) => e.trip.id === id);
+
   if (sample) return <TripView trip={sample} sample />;
-  if (!authReady || !samplesReady) return <Loading />; // still starting up
+  if (!authReady || (!samplesReady && !known)) {
+    return known ? <TripView trip={known.trip} entry={known} onDone={onDone} /> : <Loading id={sample ? null : id} />; // still starting up
+  }
   if (!user) return <HomePage message="Sign in with Google to open or join this trip." />;
   if (denied) return <JoinTrip id={id} onJoined={() => setAttempt((n) => n + 1)} />;
-  if (!entry) return <Loading />;
-  return <TripView trip={entry.trip} entry={entry} onDone={onDone} />;
+  const shown = entry ?? known;
+  if (!shown) return <Loading id={id} />;
+  return <TripView trip={shown.trip} entry={shown} onDone={onDone} />;
 }
 
-function Loading() {
+function Loading({ id }: { id: string | null }) {
   return (
-    <Page viewId="view-trip" hero={{ eyebrow: 'GoWander · live', title: '', nav: <><BackLink /><AccountChip /></> }}>
+    <Page viewId="view-trip" hero={{ eyebrow: 'GoWander · live', title: '', nav: <><BackLink /><AccountChip /></>, tripId: id }}>
       <div className="home-skel" aria-hidden="true"><div className="sk-card" /></div>
     </Page>
   );
