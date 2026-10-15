@@ -142,8 +142,8 @@ nwr["amenity"~"^(bar|pub|biergarten|nightclub)$"]["name"]${drink}->.drink;
 .shop out center tags 60;`;
 }
 
-type Tags = Record<string, string | undefined>;
-interface OsmElement { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Tags }
+export type Tags = Record<string, string | undefined>;
+export interface OsmElement { type: string; id: number; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Tags }
 
 const classify = (tags: Tags) => KINDS.find((x) => tags[x.k] === x.v) || null;
 
@@ -212,7 +212,7 @@ const cacheKey = (p: LatLng) => `gw-near2-${p.lat.toFixed(4)},${p.lng.toFixed(4)
 
 // The public servers are volunteer-run and often busy. Ask the first; if it fails, or hasn't
 // answered within a few seconds, also ask the next. The first good answer wins.
-function fetchOverpass(body: string): Promise<{ elements?: OsmElement[] }> {
+export function fetchOverpass(body: string): Promise<{ elements?: OsmElement[] }> {
   return new Promise((resolve, reject) => {
     const ctls: AbortController[] = [];
     let next = 0, failed = 0, settled = false;
@@ -240,6 +240,17 @@ function fetchOverpass(body: string): Promise<{ elements?: OsmElement[] }> {
 }
 
 const memo = new Map<string, NearbyItem[]>();
+
+/** Nearby places already looked up on this device (no network), or null. */
+export function cachedNearby(place: LatLng): NearbyItem[] | null {
+  const key = cacheKey(place);
+  const known = memo.get(key);
+  if (known) return known;
+  try {
+    const hit = JSON.parse(localStorage.getItem(key) || 'null');
+    return hit && Array.isArray(hit.items) ? hit.items : null;
+  } catch { return null; }
+}
 
 // Everything worth suggesting around a place, nearest first. Rank it for a stop with forStop.
 export async function nearbyPlaces(place: LatLng): Promise<NearbyItem[]> {

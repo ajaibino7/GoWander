@@ -1,6 +1,6 @@
 // Trip data helpers: validation, the bundled sample trips, share links and backup files.
 // Signed-in trips live in Firestore (see cloud.ts).
-import type { Day, DayNote, NoteType, Stop, StopKind, StopTag, Trip } from './types';
+import type { Booking, Day, DayNote, NoteType, Stop, StopKind, StopTag, Trip } from './types';
 import { DEFAULT_TZ, validTz, newId, downloadFile } from './util';
 
 const SAMPLES_URL = 'data/trips.json';
@@ -29,6 +29,24 @@ export const newStopId = (): string => `s${Math.random().toString(36).slice(2, 1
 
 type Raw = Record<string, unknown>;
 const isObj = (v: unknown): v is Raw => !!v && typeof v === 'object';
+
+// Ticket / booking details: only the known fields, trimmed; links must be web links. Nothing
+// left → no booking.
+export function normalizeBooking(raw: unknown): Booking | undefined {
+  if (!isObj(raw)) return undefined;
+  const b: Booking = {};
+  const ref = str(raw.ref, 60);
+  const pnr = str(raw.pnr, 40).replace(/\D/g, '').slice(0, 10);
+  const phone = str(raw.phone, 40).replace(/[^\d+\-() ]/g, '').trim().slice(0, 30);
+  const link = str(raw.link, 500);
+  const note = str(raw.note, 300);
+  if (ref) b.ref = ref;
+  if (pnr) b.pnr = pnr;
+  if (phone) b.phone = phone;
+  if (/^https?:\/\/\S+$/i.test(link)) b.link = link;
+  if (note) b.note = note;
+  return Object.keys(b).length ? b : undefined;
+}
 
 export function normalizeTrip(raw: unknown): Trip {
   if (!isObj(raw) || !Array.isArray(raw.days)) throw new Error('That doesn\'t look like a trip.');
@@ -65,6 +83,8 @@ export function normalizeTrip(raw: unknown): Trip {
       if (note) stop.note = note;
       if (TAGS.includes(s.tag as StopTag)) stop.tag = s.tag as StopTag;
       if (isObj(s.departure)) stop.departure = { buffer: clamp(s.departure.buffer, 0, 360, 60) };
+      const booking = normalizeBooking(s.booking);
+      if (booking) stop.booking = booking;
       day.stops.push(stop);
     }
     for (const n of Array.isArray(d.notes) ? d.notes.slice(0, 10) : []) {
@@ -86,6 +106,24 @@ function normalizeDoc(raw: unknown): { version: 1; trips: Trip[] } {
     try { trips.push(normalizeTrip(t)); } catch { /* skip broken entries */ }
   }
   return { version: 1, trips };
+}
+
+/* ============================================================
+   Trip templates (bundled): ready-made plans to start a new trip from
+   ============================================================ */
+export interface Template { trip: Trip; tagline: string; emoji: string }
+let templatesP: Promise<Template[]> | null = null;
+export function loadTemplates(): Promise<Template[]> {
+  templatesP ??= fetch('data/templates.json')
+    .then((r) => (r.ok ? r.json() : { templates: [] }))
+    .then((j: { templates?: unknown[] }) => (j.templates || []).flatMap((t) => {
+      try {
+        const raw = t as Record<string, unknown>;
+        return [{ trip: normalizeTrip(raw), tagline: str(raw.tagline, 80), emoji: str(raw.emoji, 8) || '🧳' }];
+      } catch { return []; }
+    }))
+    .catch(() => { templatesP = null; return []; });
+  return templatesP;
 }
 
 /* ============================================================

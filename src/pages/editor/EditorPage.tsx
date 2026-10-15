@@ -14,6 +14,7 @@ import type { DraftTrip, Trip } from '../../lib/types';
 import type { CoverInfo } from '../../lib/autocover';
 import { HomePage } from '../Home';
 import { EditorForm, type EditorNotice } from './EditorForm';
+import { clearPendingDraft, peekPendingDraft } from '../../app/pendingDraft';
 
 function blankTrip(): DraftTrip {
   const tz = deviceTz();
@@ -62,8 +63,12 @@ interface SessionProps {
 function EditorSession({ isNew, id, trip, baseMs, owner, shared, onReload }: SessionProps) {
   const { user } = useAppData();
   const navigate = useNavigate();
-  const start = useMemo<DraftTrip>(() => (trip ? structuredClone(trip) : blankTrip()), []); // eslint-disable-line react-hooks/exhaustive-deps
-  const [dirty, setDirty] = useState(false);
+  // A new trip starts blank — or from a template / "plan again", handed over in memory.
+  const [prepared] = useState(() => (trip ? null : peekPendingDraft()));
+  const start = useMemo<DraftTrip>(() => (trip ? structuredClone(trip) : prepared ?? blankTrip()), []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => clearPendingDraft(), []);
+  // A prepared trip isn't saved yet: leaving asks first.
+  const [dirty, setDirty] = useState(!!prepared);
   const [notice, setNotice] = useState<EditorNotice | null>(null);
   const [coverP] = useState<Promise<string | null>>(() => (isNew ? Promise.resolve(null) : firstUploadedCover(id)));
   const [autoP] = useState<Promise<CoverInfo | null>>(() => (isNew || !trip ? Promise.resolve(null) : ensureAutoCover(trip)));

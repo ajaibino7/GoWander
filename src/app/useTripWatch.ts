@@ -6,6 +6,7 @@ import * as cloud from '../lib/cloud';
 import { toast } from '../lib/toast';
 import type { TripEntry, User } from '../lib/types';
 import { ensureAutoCover, useUploadedCover } from './covers';
+import { displayName } from './names';
 
 export function useTripWatch(id: string, user: User | null): { entry: TripEntry | null; denied: boolean; retry: () => void } {
   const navigate = useNavigate();
@@ -33,4 +34,5 @@ export function useTripWatch(id: string, user: User | null): { entry: TripEntry 
   return { entry, denied, retry: () => setAttempt((n) => n + 1) };
 }
 
-export const nameOf = (email: string, user: User | null): string => (email === user?.email ? 'You' : (email || '').split('@')[0] || '');
+/** "You" for yourself; anyone else by their nickname on the trip (or the start of their email). */
+export const nameOf = (email: string, user: User | null): string => (email === user?.email ? 'You' : displayName(email));

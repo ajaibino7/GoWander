@@ -3,9 +3,12 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import * as cloud from '../lib/cloud';
 import { autoCover, creditUrl, isAutoUrl, sizedUrl, smallUrl, type CoverInfo, type CoverTrip } from '../lib/autocover';
+import { bootSnapshot } from './bootCache';
 
 const uploaded = new Map<string, string>(); // trip id → image data URL
 const auto = new Map<string, CoverInfo>(); // trip id → destination photo
+// Last visit's photos, so trip cards and headers have them on the first frame.
+for (const [id, info] of Object.entries(bootSnapshot()?.covers || {})) auto.set(id, info);
 
 let version = 0;
 const listeners = new Set<() => void>();
@@ -13,6 +16,8 @@ const emit = () => { version++; for (const l of listeners) l(); };
 const subscribe = (l: () => void) => { listeners.add(l); return () => listeners.delete(l); };
 /** Re-renders when any cover arrives or changes. */
 export const useCovers = (): number => useSyncExternalStore(subscribe, () => version);
+/** Calls cb whenever a cover arrives or changes (without re-rendering anything). */
+export const onCoversChange = (cb: () => void): (() => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; };
 
 const isDataImage = (u: string | null): u is string => !!u && /^data:image\/(jpeg|png|webp);base64,/.test(u);
 
@@ -57,6 +62,13 @@ export function ensureAutoCover(trip: CoverTrip & { id?: string }): Promise<Cove
 }
 
 export function autoCoverOf(tripId: string): CoverInfo | null { return auto.get(tripId) || null; }
+
+/** The destination photos known for these trips (for the start-up snapshot). */
+export function autoCoversFor(ids: string[]): Record<string, CoverInfo> {
+  const out: Record<string, CoverInfo> = {};
+  for (const id of ids) { const a = auto.get(id); if (a) out[id] = a; }
+  return out;
+}
 
 /** The header background for a trip, and the photo credit when it's a destination photo. */
 export function heroCover(tripId: string | null | undefined): { url: string | null; credit: { text: string; href: string } | null } {

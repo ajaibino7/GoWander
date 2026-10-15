@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useAppData } from '../app/AppData';
-import { useReveal } from '../app/motion';
+import { useLeaving, useNewItems, useReveal } from '../app/motion';
 import { nameOf, useTripWatch } from '../app/useTripWatch';
+import { useTripProfiles } from '../app/names';
 import { BackLink } from '../components/Hero';
 import { Page, PageLoading } from '../components/Page';
 import * as cloud from '../lib/cloud';
@@ -12,6 +13,7 @@ import { toast } from '../lib/toast';
 import type { ChecklistItem, ChecklistList } from '../lib/types';
 import { HomePage } from './Home';
 import { JoinTrip } from './trip/JoinTrip';
+import { PackingSheet } from './PackingSheet';
 
 const CHECKLISTS: Record<ChecklistList, { title: string; placeholder: string; noun: string; ideas: string[] }> = {
   packing: {
@@ -28,9 +30,11 @@ export function ChecklistPage() {
   const { id = '' } = useParams();
   const { user, authReady } = useAppData();
   const { entry, denied, retry } = useTripWatch(id, user);
+  useTripProfiles(user ? id : null);
   const [items, setItems] = useState<ChecklistItem[] | null>(null);
   // Items ticked just now get a little "pop" (the list redraws on every change).
   const [justTicked, setJustTicked] = useState<string | null>(null);
+  const [packing, setPacking] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,11 +46,14 @@ export function ChecklistPage() {
   }, [id, user, !!entry]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useReveal(ref, '.cl-item', !!items);
+  // Items someone adds slide in; removed ones slide away.
+  const isNew = useNewItems(items ? items.map((x) => x.id) : null);
+  const [leaving, leave] = useLeaving();
 
-  if (!authReady) return <PageLoading viewId="view-checklist" eyebrow="Checklist" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} />;
+  if (!authReady) return <PageLoading viewId="view-checklist" eyebrow="Checklist" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} tripId={id} />;
   if (!user) return <HomePage message="Sign in with Google to open this trip." />;
   if (denied) return <JoinTrip id={id} onJoined={retry} />;
-  if (!entry) return <PageLoading viewId="view-checklist" eyebrow="Checklist" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} />;
+  if (!entry) return <PageLoading viewId="view-checklist" eyebrow="Checklist" back={<BackLink to={`/trip/${encodeURIComponent(id)}`} label="Back to trip" />} tripId={id} />;
 
   const add = async (list: ChecklistList, text: string) => {
     try { await cloud.addChecklistItem(user, id, list, text); } catch (err) { toast((err as Error).message, 'bad'); }
@@ -71,7 +78,7 @@ export function ChecklistPage() {
               <div className="cl-bar" aria-hidden="true"><span style={{ width: mine.length ? `${(done / mine.length) * 100}%` : '0' }} /></div>
               <ul className="cl-items">
                 {mine.length ? mine.map((x) => (
-                  <li key={x.id} className={`cl-item${x.done ? ' done' : ''}${x.done && justTicked === x.id ? ' pop' : ''}`}>
+                  <li key={x.id} className={`cl-item${x.done ? ' done' : ''}${x.done && justTicked === x.id ? ' pop' : ''}${isNew(x.id) ? ' fresh' : ''}${leaving.has(x.id) ? ' leaving' : ''}`}>
                     <label>
                       <input type="checkbox" checked={x.done} onChange={async (e) => {
                         const on = e.target.checked;
@@ -81,12 +88,18 @@ export function ChecklistPage() {
                       <span className="cl-text">{x.text}</span>
                     </label>
                     {x.done && x.doneBy ? <span className="cl-by" title={x.doneBy}>✓ {nameOf(x.doneBy, user)}</span> : null}
-                    <button className="icon-btn" type="button" title="Remove" aria-label={`Remove ${x.text}`} onClick={async () => {
-                      try { await cloud.deleteListItem(id, 'checklist', x.id); } catch (err) { toast((err as Error).message, 'bad'); }
-                    }}>✕</button>
+                    <button className="icon-btn" type="button" title="Remove" aria-label={`Remove ${x.text}`} disabled={leaving.has(x.id)} onClick={() => leave(x.id, () =>
+                      cloud.deleteListItem(id, 'checklist', x.id).catch((err: Error) => toast(err.message, 'bad')))}>✕</button>
                   </li>
                 )) : <li className="cl-empty muted small">Nothing here yet. Add your own, or pick from the ideas below.</li>}
               </ul>
+              {list === 'packing' ? (
+                <button className="smart-btn" type="button" onClick={() => setPacking(true)}>
+                  <span className="smart-spark" aria-hidden="true">✨</span>
+                  <span><strong>Pack from the trip</strong><span className="muted small">Suggestions from your stops, the forecast and trip length</span></span>
+                  <span aria-hidden="true">›</span>
+                </button>
+              ) : null}
               <AddForm placeholder={c.placeholder} onAdd={(text) => add(list, text)} />
               {ideas.length ? (
                 <div className="cl-ideas">
@@ -97,6 +110,7 @@ export function ChecklistPage() {
           );
         })}
       </div>
+      {packing ? <PackingSheet trip={entry.trip} user={user} existing={(items || []).filter((x) => x.list === 'packing').map((x) => x.text)} onClose={() => setPacking(false)} /> : null}
     </Page>
   );
 }

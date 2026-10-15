@@ -24,8 +24,11 @@
   --accent: var(--sea);
   --shadow: 0 1px 2px rgba(20, 30, 50, .06), 0 6px 20px rgba(20, 30, 50, .06);
   --radius: 14px;
-  --serif: Georgia, "Times New Roman", serif;
-  --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  /* One family throughout, Lato (bundled; see index.html), in three weights: regular text, bold
+     labels and headings, black for big titles and numbers. --serif is the heading style (the name
+     is from when headings used a serif). */
+  --serif: "Lato", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --sans: "Lato", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   color-scheme: light;
 }
 
@@ -81,7 +84,10 @@ body {
   color: var(--ink);
   font-family: var(--sans);
   font-size: 15px;
-  line-height: 1.45;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 button { font: inherit; color: inherit; }
 [hidden] { display: none !important; }
@@ -95,16 +101,20 @@ button { font: inherit; color: inherit; }
   overflow: hidden;
 }
 .hero .skyline { position: absolute; left: 0; right: 0; bottom: -1px; width: 100%; height: 70px; }
-/* A trip's cover photo replaces the default sunset artwork. The shading keeps white text readable
-   on any photo; the skyline silhouette is dropped but the curved edge stays. */
-.hero.has-cover {
-  background:
-    linear-gradient(180deg, rgba(8, 18, 36, .62) 0%, rgba(8, 18, 36, .32) 45%, rgba(8, 18, 36, .72) 100%),
-    var(--cover) center / cover no-repeat,
-    #0f2240;
-  padding-bottom: 88px;
+/* A trip's cover photo fades in over the default sunset artwork once it has loaded (and settles
+   from a slight zoom). The shading keeps white text readable on any photo; the skyline silhouette
+   fades out but the curved edge stays. Trip headers are tall enough for a photo from the start,
+   so nothing below moves when one arrives. */
+.hero.trip { padding-bottom: 88px; }
+.hero-photo {
+  position: absolute; inset: 0; background: center / cover no-repeat;
+  opacity: 0; transform: scale(1.06); transition: opacity .8s ease, transform 1.6s cubic-bezier(.32, .72, 0, 1);
 }
-.hero.has-cover .skyline path:first-child { display: none; }
+.hero-photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8, 18, 36, .62) 0%, rgba(8, 18, 36, .32) 45%, rgba(8, 18, 36, .72) 100%); }
+.hero-photo.on { opacity: 1; transform: none; }
+.hero-photo.instant { transition: none; }
+.hero .skyline path:first-child { transition: opacity .6s ease; }
+.hero.photo-on .skyline path:first-child { opacity: 0; }
 .hero.has-cover h1, .hero.has-cover .hero-sub, .hero.has-cover .hero-desc { text-shadow: 0 1px 8px rgba(0, 0, 0, .45); }
 /* ---------- Home header: a dawn coastline ----------
    The logo is drawn for light backgrounds, so the home page gets a light morning sky
@@ -220,7 +230,7 @@ button { font: inherit; color: inherit; }
 .eyebrow { font-size: 11px; letter-spacing: .28em; text-transform: uppercase; opacity: .85; }
 /* The hero label carries the GoWander name, so it keeps its own capitalisation. */
 .hero .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: none; }
-.hero h1 { font-family: var(--serif); font-weight: normal; font-size: clamp(34px, 8vw, 52px); line-height: 1.05; margin: 8px 0 6px; }
+.hero h1 { font-family: var(--serif); font-weight: 900; font-size: clamp(34px, 8vw, 52px); line-height: 1.05; margin: 8px 0 6px; }
 .hero h1 em { color: var(--sun); }
 .hero-sub { font-size: 15px; opacity: .92; }
 .hero-desc { font-size: 14px; opacity: .85; max-width: 640px; margin-bottom: 4px; }
@@ -248,7 +258,7 @@ button { font: inherit; color: inherit; }
 /* Phones: status → day tabs → map → timeline. */
 @media (max-width: 899px) {
   .col-main { display: contents; }
-  .status-card, .trip-tools { order: 1; }
+  .status-card, .trip-tools, .hub { order: 1; }
   .tabs { order: 2; }
   .col-map { order: 3; }
   .day { order: 4; }
@@ -288,7 +298,7 @@ button { font: inherit; color: inherit; }
 .loc-dot.on { background: #2b7de9; box-shadow: 0 0 0 3px rgba(43, 125, 233, .25); }
 .loc-dot.err { background: var(--bad); }
 
-.now-title { font-family: var(--serif); font-size: 24px; line-height: 1.2; margin: 14px 0 4px; }
+.now-title { font-family: var(--serif); font-size: 24px; font-weight: 900; line-height: 1.2; margin: 14px 0 4px; }
 .now-meta { color: var(--muted); font-size: 14px; }
 .status-msg { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 14px; }
 .status-msg.ok   { background: var(--ok-bg); }
@@ -322,7 +332,7 @@ button { font: inherit; color: inherit; }
   border: 1px solid var(--line); background: var(--surface); border-radius: 12px;
   padding: 8px 6px; cursor: pointer; text-align: center; min-width: 0;
 }
-.tab .tn { font-family: var(--serif); font-size: 20px; line-height: 1; }
+.tab .tn { font-family: var(--serif); font-size: 20px; font-weight: 900; line-height: 1; }
 .tab .td { font-size: 11px; color: var(--muted); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .tab[aria-selected="true"] .td { color: rgba(255, 255, 255, .85); }
@@ -340,8 +350,8 @@ button { font: inherit; color: inherit; }
 /* ---------- Day ---------- */
 .day { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--line); overflow: hidden; }
 .day-band { color: #fff; padding: 18px 16px 16px; position: relative; overflow: hidden; }
-.day-band .num { position: absolute; right: 12px; top: -8px; font-family: var(--serif); font-size: 96px; opacity: .15; line-height: 1; }
-.day-band h2 { font-family: var(--serif); font-weight: normal; font-size: 24px; margin: 6px 0 0; line-height: 1.2; position: relative; }
+.day-band .num { position: absolute; right: 12px; top: -8px; font-family: var(--serif); font-size: 96px; font-weight: 900; opacity: .15; line-height: 1; }
+.day-band h2 { font-family: var(--serif); font-weight: 900; font-size: 24px; margin: 6px 0 0; line-height: 1.2; position: relative; }
 .day-band .eyebrow { position: relative; }
 .theme-navy  { --accent: #1f4e79; }
 .theme-green { --accent: #2f7a59; }

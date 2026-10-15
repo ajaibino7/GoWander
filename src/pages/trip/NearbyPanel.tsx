@@ -46,10 +46,12 @@ export function NearbyPanel() {
             <button key={k} className="nb-chip" type="button" role="tab" aria-selected={filter === k} onClick={() => setNearbyFilter(k)}>{label} <span>{n}</span></button>
           ))}
         </div>
-        <ul className="nb-list">
-          {shown.map((x) => (
+        {/* Keyed by the filter: switching filters lets the new list ripple in. */}
+        <ul className="nb-list" key={filter}>
+          {shown.map((x, i) => (
             <li
               key={x.id}
+              style={{ '--i': Math.min(i, 10) } as React.CSSProperties}
               tabIndex={0}
               onClick={(e) => { if (!(e.target as HTMLElement).closest('a')) mapFocusNearby(x.id); }}
               onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); mapFocusNearby(x.id); } }}

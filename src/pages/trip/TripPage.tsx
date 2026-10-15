@@ -4,12 +4,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAppData } from '../../app/AppData';
 import { ensureAutoCover, useUploadedCover } from '../../app/covers';
+import { useReveal } from '../../app/motion';
 import { copyTrip } from '../../app/actions';
 import { AccountChip, BackLink } from '../../components/Hero';
 import { Page } from '../../components/Page';
 import * as cloud from '../../lib/cloud';
 import {
-  closeNearby, live, mountTrip, now, openNearby, refitMap, setDoneMarks, syncFollow, tripPhase, unmountTrip, useLive,
+  closeNearby, emit, live, mountTrip, now, openNearby, refitMap, setDoneMarks, syncFollow, tripPhase, unmountTrip, useLive, type LiveDay,
 } from '../../lib/live';
 import { canEditTrip } from '../../lib/tripStatus';
 import { fmtDur, fmtRange } from '../../lib/util';
@@ -22,6 +23,10 @@ import { DayTabs, DayView } from './DayView';
 import { TripMap } from './TripMap';
 import { NearbyPanel, scrollToMapCard } from './NearbyPanel';
 import { TripTools } from './TripTools';
+import { RunningLateSheet } from './RunningLate';
+import { GroupPanel, useGroupSharing } from './GroupMap';
+import { profilesLoaded, useTripProfiles } from '../../app/names';
+import { NicknameCard } from '../../components/NicknameCard';
 
 interface ViewProps {
   trip: Trip;
@@ -38,7 +43,19 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
   const { user } = useAppData();
   const navigate = useNavigate();
   const [copying, setCopying] = useState(false);
+  const [lateDay, setLateDay] = useState<LiveDay | null>(null);
+  const wrap = useRef<HTMLDivElement>(null);
   useLive();
+  // Opening a trip: the status card, tools and the day's stops rise in one after another.
+  useReveal(wrap, '.status-card, .hub, .tabs, .day-band, .timeline > li');
+  // Shared trips: your location for the group map (when you share it), and everyone else's.
+  const shared = !!entry && !!user && !sample && !preview;
+  useGroupSharing(shared ? trip.id : null, shared ? user : null);
+  const profiles = useTripProfiles(shared ? trip.id : null);
+  // Once per trip, on a group trip: ask what to call you (until you pick a name or say not now).
+  const [nickHidden, setNickHidden] = useState(() => { try { return !!localStorage.getItem(`gw-nick-skip-${trip.id}`); } catch { return false; } });
+  const askNick = shared && !nickHidden && (entry?.meta.memberEmails.length || 0) > 1 && profilesLoaded(trip.id) && !profiles.get(user.email)?.nickname;
+  const skipNick = () => { try { localStorage.setItem(`gw-nick-skip-${trip.id}`, '1'); } catch { /* storage unavailable */ } setNickHidden(true); };
 
   // Start the live engine for this trip before the first paint; a new version of the same trip
   // (another member's edit) keeps your place in the page.
@@ -48,7 +65,8 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
 
   // The map card grows a panel for nearby places: tell the map its size changed.
   const nearbyOpen = !!live.nearby;
-  useEffect(() => { setTimeout(() => live.map?.invalidateSize(), 0); }, [nearbyOpen]);
+  const groupOpen = live.groupOn;
+  useEffect(() => { setTimeout(() => live.map?.invalidateSize(), 0); }, [nearbyOpen, groupOpen]);
 
   if (live.trip?.id !== trip.id) return null; // the engine starts in the layout effect, before paint
   const t = now();
@@ -99,6 +117,13 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
     );
 
   const onNearby = () => scrollToMapCard();
+  // "Group map": open the panel under the map and bring it into view (on a wide screen the map
+  // column stays put, so the panel would otherwise open out of sight).
+  const openGroup = () => {
+    live.groupOn = true;
+    emit();
+    setTimeout(() => document.querySelector('.group-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 80);
+  };
 
   return (
     <Page
@@ -109,6 +134,7 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
     >
       {/* Map popups are Leaflet HTML: their "What to do nearby" buttons are handled here. */}
       <div
+        ref={wrap}
         style={{ display: 'contents' }}
         onClick={(e) => {
           const b = (e.target as HTMLElement).closest<HTMLElement>('.leaflet-popup [data-nearby]');
@@ -118,22 +144,31 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
         }}
       >
         <div className="col-main">
-          <StatusCard onNearby={onNearby} />
-          {preview ? null : <TripTools trip={trip} sample={sample} />}
+          <StatusCard onNearby={onNearby} onLate={entry && user && canEditTrip(entry.meta, user) ? setLateDay : undefined} />
+          {askNick && user ? <NicknameCard tripId={trip.id} user={user} current="" onDismiss={skipNick} /> : null}
+          {preview ? null : <TripTools trip={trip} sample={sample} onGroup={openGroup} />}
           <DayTabs phase={phase} />
-          <DayView phase={phase} onNearby={onNearby} />
+          <DayView
+            phase={phase}
+            onNearby={onNearby}
+            review={shared && user ? { me: user.email, save: (stopId, vote, note) => { cloud.setReview(user, trip.id, stopId, vote, note).catch((e: Error) => toast(e.message, 'bad')); } } : undefined}
+          />
         </div>
         <aside className="col-map">
-          <div className={`map-card${nearbyOpen ? ' has-nearby' : ''}`}>
+          <div className={`map-card${nearbyOpen ? ' has-nearby' : ''}${groupOpen ? ' has-group' : ''}`}>
             <TripMap />
             <div className="map-foot">
               <button type="button" className="link-btn" onClick={() => { closeNearby(false); refitMap(); }}>Show all stops</button>
               <button type="button" className="link-btn" disabled={!live.pos} onClick={() => { if (live.pos && live.map) live.map.setView([live.pos.lat, live.pos.lng], 16); }}>Centre on me</button>
             </div>
             <NearbyPanel />
+            {live.groupOn && shared && entry && user ? (
+              <GroupPanel tripId={trip.id} user={user} members={entry.meta.memberEmails} endOfDay={live.clock.at(live.clock.dateKey(now()), '23:59').getTime()} />
+            ) : null}
           </div>
         </aside>
       </div>
+      {lateDay && entry && user ? <RunningLateSheet day={lateDay} entry={entry} user={user} onClose={() => setLateDay(null)} /> : null}
     </Page>
   );
 }
@@ -141,7 +176,7 @@ export function TripView({ trip, entry, sample = false, preview = false, onDone 
 /** #/trip/:id — a sample, one of your trips, or the join screen. */
 export function TripPage() {
   const { id = '' } = useParams();
-  const { user, authReady, samples, samplesReady } = useAppData();
+  const { user, authReady, samples, samplesReady, myTrips, cached } = useAppData();
   const navigate = useNavigate();
   const [entry, setEntry] = useState<TripEntry | null>(null);
   const [denied, setDenied] = useState(false);
@@ -157,6 +192,7 @@ export function TripPage() {
   const [onDone] = useState(() => (stopId: string, on: boolean) => {
     const u = userRef.current;
     if (u) cloud.setStopDone(u, id, stopId, on).catch((e: Error) => toast(e.message, 'bad'));
+    else toast('Still connecting. Try that again in a moment.', 'info');
   });
 
   useEffect(() => {
@@ -178,6 +214,7 @@ export function TripPage() {
       if (!progressStarted) {
         progressStarted = true;
         cloud.watchProgress(id, setDoneMarks).then(keep);
+        cloud.watchReviews(id, (r) => { live.reviews = r; emit(); }).then(keep);
       }
     }, (err) => {
       if (err === 'denied') setDenied(true);
@@ -186,17 +223,24 @@ export function TripPage() {
     return () => { cancelled = true; offs.forEach((u) => u()); };
   }, [id, shared, user, navigate, attempt]);
 
+  // Until the trip's own live connection answers, show it from what the app already has: the
+  // trip list (opening it from home) or last visit's snapshot (opening the app) — no placeholder.
+  const known = denied ? undefined : myTrips.find((e) => e.trip.id === id) ?? cached?.trips.find((e) => e.trip.id === id);
+
   if (sample) return <TripView trip={sample} sample />;
-  if (!authReady || !samplesReady) return <Loading />; // still starting up
+  if (!authReady || (!samplesReady && !known)) {
+    return known ? <TripView trip={known.trip} entry={known} onDone={onDone} /> : <Loading id={sample ? null : id} />; // still starting up
+  }
   if (!user) return <HomePage message="Sign in with Google to open or join this trip." />;
   if (denied) return <JoinTrip id={id} onJoined={() => setAttempt((n) => n + 1)} />;
-  if (!entry) return <Loading />;
-  return <TripView trip={entry.trip} entry={entry} onDone={onDone} />;
+  const shown = entry ?? known;
+  if (!shown) return <Loading id={id} />;
+  return <TripView trip={shown.trip} entry={shown} onDone={onDone} />;
 }
 
-function Loading() {
+function Loading({ id }: { id: string | null }) {
   return (
-    <Page viewId="view-trip" hero={{ eyebrow: 'GoWander · live', title: '', nav: <><BackLink /><AccountChip /></> }}>
+    <Page viewId="view-trip" hero={{ eyebrow: 'GoWander · live', title: '', nav: <><BackLink /><AccountChip /></>, tripId: id }}>
       <div className="home-skel" aria-hidden="true"><div className="sk-card" /></div>
     </Page>
   );

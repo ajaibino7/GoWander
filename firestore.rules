@@ -131,8 +131,14 @@ service cloud.firestore {
       // ("Asha paid Ravi back") is stored the same way, as kind 'settlement'.
       match /expenses/{expenseId} {
         function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        // Optional: a category, a split by amount (shares: member → their part), and whether a
+        // bill photo is stored (photos/bill-<id>).
         function validExpense(d, members) {
-          return d.keys().hasOnly(['title', 'amount', 'currency', 'paidBy', 'split', 'date', 'kind', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt'])
+          return d.keys().hasOnly(['title', 'amount', 'currency', 'paidBy', 'split', 'date', 'kind', 'category', 'shares', 'hasBill', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt'])
+            && d.get('category', 'other') in ['food', 'travel', 'stay', 'tickets', 'shopping', 'other']
+            && d.get('shares', {}) is map && d.get('shares', {}).size() <= 20
+            && d.get('shares', {}).keys().toSet().difference(members.toSet()).size() == 0
+            && d.get('hasBill', false) is bool
             && d.title is string && d.title.size() > 0 && d.title.size() <= 120
             && d.amount is number && d.amount > 0 && d.amount <= 100000000
             && d.currency is string && d.currency.matches('[A-Z]{3}')
@@ -152,6 +158,163 @@ service cloud.firestore {
           && request.resource.data.createdBy == resource.data.createdBy
           && request.resource.data.createdAt == resource.data.createdAt;
         allow delete: if isMember(trip());
+      }
+
+      // Photos for bills and journal entries (id "bill-<expenseId>" or "j-<entryId>"), one per
+      // document. The app shrinks them to well under 300 KB.
+      match /photos/{photoId} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        allow read: if isMember(trip());
+        allow create, update: if isMember(trip())
+          && photoId.matches('(bill|j)-[A-Za-z0-9_-]{1,40}')
+          && request.resource.data.keys().hasOnly(['data', 'createdBy', 'createdAt'])
+          && request.resource.data.data is string
+          && request.resource.data.data.size() <= 420000
+          && request.resource.data.data.matches('data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+')
+          && request.resource.data.createdBy == myEmail()
+          && request.resource.data.createdAt == request.time;
+        allow delete: if isMember(trip());
+      }
+
+      // Ideas board: places someone would like to visit. Any member adds ideas and likes them;
+      // the person who added one, or anyone who can edit the plan, edits or removes it.
+      match /ideas/{ideaId} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        function validIdea(d) {
+          return d.keys().hasOnly(['title', 'note', 'place', 'link', 'likes', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt'])
+            && d.title is string && d.title.size() > 0 && d.title.size() <= 120
+            && d.note is string && d.note.size() <= 500
+            && d.link is string && d.link.size() <= 500
+            && (d.place == null || d.place is map)
+            && d.likes is list && d.likes.size() <= 20
+            && d.updatedBy == myEmail() && d.updatedAt == request.time;
+        }
+        // Only your own like changes.
+        function onlyMyLike() {
+          return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'updatedBy', 'updatedAt'])
+            && request.resource.data.likes.toSet().difference(resource.data.likes.toSet())
+                 .union(resource.data.likes.toSet().difference(request.resource.data.likes.toSet()))
+                 .difference([myEmail()].toSet()).size() == 0;
+        }
+        allow read: if isMember(trip());
+        allow create: if isMember(trip()) && validIdea(request.resource.data)
+          && request.resource.data.likes.size() == 0
+          && request.resource.data.createdBy == myEmail() && request.resource.data.createdAt == request.time;
+        allow update: if isMember(trip()) && validIdea(request.resource.data)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt
+          && (resource.data.createdBy == myEmail() || canEdit(trip()) || onlyMyLike());
+        allow delete: if resource.data.createdBy == myEmail() || canEdit(trip()) || isOwner(trip());
+      }
+
+      // Group polls. Any member starts one and votes (changing only their own vote); the person
+      // who started it, or anyone who can edit the plan, closes or removes it.
+      match /polls/{pollId} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        function validPoll(d) {
+          return d.keys().hasOnly(['question', 'options', 'votes', 'dayDate', 'closed', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt'])
+            && d.question is string && d.question.size() > 0 && d.question.size() <= 160
+            && d.options is list && d.options.size() >= 2 && d.options.size() <= 8
+            && d.votes is map && d.votes.size() <= 20
+            && d.dayDate is string && d.dayDate.size() <= 10
+            && d.closed is bool
+            && d.updatedBy == myEmail() && d.updatedAt == request.time;
+        }
+        function onlyMyVote() {
+          return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes', 'updatedBy', 'updatedAt'])
+            && request.resource.data.votes.diff(resource.data.votes).affectedKeys().hasOnly([myEmail()])
+            && resource.data.closed == false;
+        }
+        allow read: if isMember(trip());
+        allow create: if isMember(trip()) && validPoll(request.resource.data)
+          && request.resource.data.votes.size() == 0 && request.resource.data.closed == false
+          && request.resource.data.createdBy == myEmail() && request.resource.data.createdAt == request.time;
+        allow update: if isMember(trip()) && validPoll(request.resource.data)
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt
+          && (onlyMyVote() || resource.data.createdBy == myEmail() || canEdit(trip()));
+        allow delete: if resource.data.createdBy == myEmail() || canEdit(trip()) || isOwner(trip());
+      }
+
+      // Trip settings — the budget. Part of the plan, so members who can edit change it.
+      match /settings/{docId} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        allow read: if isMember(trip());
+        allow create, update: if docId == 'budget' && canEdit(trip())
+          && request.resource.data.keys().hasOnly(['perPerson', 'currency', 'updatedBy', 'updatedAt'])
+          && request.resource.data.perPerson is number && request.resource.data.perPerson >= 0 && request.resource.data.perPerson <= 100000000
+          && request.resource.data.currency is string && request.resource.data.currency.matches('[A-Z]{3}')
+          && request.resource.data.updatedBy == myEmail() && request.resource.data.updatedAt == request.time;
+        allow delete: if canEdit(trip());
+      }
+
+      // Each member's own details for the group: their nickname (shown instead of their email)
+      // and their UPI ID for settling up. Document id = their email; only they write it.
+      match /profiles/{email} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        function upi(d) { return d.get('upi', ''); }
+        function nickname(d) { return d.get('nickname', ''); }
+        allow read: if isMember(trip());
+        allow create, update: if isMember(trip()) && email == myEmail()
+          && request.resource.data.keys().hasOnly(['upi', 'nickname', 'updatedAt'])
+          && upi(request.resource.data) is string && upi(request.resource.data).size() <= 60
+          && (upi(request.resource.data) == '' || upi(request.resource.data).matches('[A-Za-z0-9._-]+@[A-Za-z0-9.-]+'))
+          && nickname(request.resource.data) is string && nickname(request.resource.data).size() <= 30
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if email == myEmail() || isOwner(trip());
+      }
+
+      // "Where's everyone": a member's live location, only while they choose to share it.
+      // Document id = their email; only they write it, and they can stop at any time.
+      match /locations/{email} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        allow read: if isMember(trip());
+        allow create, update: if isMember(trip()) && email == myEmail()
+          && request.resource.data.keys().hasOnly(['lat', 'lng', 'accuracy', 'untilMs', 'updatedAt'])
+          && request.resource.data.lat is number && request.resource.data.lat >= -90 && request.resource.data.lat <= 90
+          && request.resource.data.lng is number && request.resource.data.lng >= -180 && request.resource.data.lng <= 180
+          && request.resource.data.accuracy is number
+          && request.resource.data.untilMs is number
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if email == myEmail() || isOwner(trip());
+      }
+
+      // Trip journal: memories (a line and maybe a photo) per day or stop. Members write their
+      // own; the author or the owner removes them.
+      match /journal/{entryId} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        function validEntry(d) {
+          return d.keys().hasOnly(['dayDate', 'stopId', 'text', 'hasPhoto', 'createdBy', 'createdAt', 'updatedAt'])
+            && d.dayDate is string && d.dayDate.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+            && d.stopId is string && d.stopId.size() <= 40
+            && d.text is string && d.text.size() <= 1000
+            && d.hasPhoto is bool
+            && (d.text.size() > 0 || d.hasPhoto)
+            && d.updatedAt == request.time;
+        }
+        allow read: if isMember(trip());
+        allow create: if isMember(trip()) && validEntry(request.resource.data)
+          && request.resource.data.createdBy == myEmail() && request.resource.data.createdAt == request.time;
+        allow update: if isMember(trip()) && validEntry(request.resource.data)
+          && resource.data.createdBy == myEmail()
+          && request.resource.data.createdBy == resource.data.createdBy
+          && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if resource.data.createdBy == myEmail() || isOwner(trip());
+      }
+
+      // 👍 / 👎 on stops. One per member per stop: document id "<stopId>__<email>".
+      match /reviews/{reviewId} {
+        function trip() { return get(/databases/$(database)/documents/trips/$(tripId)).data; }
+        allow read: if isMember(trip());
+        allow create, update: if isMember(trip())
+          && reviewId == request.resource.data.stopId + '__' + myEmail()
+          && request.resource.data.keys().hasOnly(['stopId', 'email', 'vote', 'note', 'updatedAt'])
+          && request.resource.data.stopId is string && request.resource.data.stopId.size() <= 40
+          && request.resource.data.email == myEmail()
+          && request.resource.data.vote in [1, -1]
+          && request.resource.data.note is string && request.resource.data.note.size() <= 300
+          && request.resource.data.updatedAt == request.time;
+        allow delete: if resource.data.email == myEmail() || isOwner(trip());
       }
     }
 

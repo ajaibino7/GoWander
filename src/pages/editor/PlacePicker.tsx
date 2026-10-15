@@ -69,7 +69,7 @@ export function PlacePicker({ place, recent, onClose }: { place: Place | null; r
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeRef.current(null); };
     document.addEventListener('keydown', onKey);
     document.body.classList.add('modal-open');
-    return () => { document.removeEventListener('keydown', onKey); document.body.classList.remove('modal-open'); };
+    return () => { document.removeEventListener('keydown', onKey); if (!document.querySelector('.modal')) document.body.classList.remove('modal-open'); };
   }, []);
 
   // ---- search ----

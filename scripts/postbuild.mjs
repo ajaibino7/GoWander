@@ -23,12 +23,15 @@ const files = walk(root)
   .map((f) => relative(root, f).split(sep).join('/'))
   .filter((f) => !f.endsWith('.map') && !f.startsWith('.vite/') && f !== 'sw.js' && f !== 'version.json')
   .sort();
+// Fonts for other alphabets (Cyrillic, Greek, Vietnamese) download only if a page uses them, and
+// are cached then; installing the offline copy skips them.
+const OTHER_SCRIPTS = /-(cyrillic|cyrillic-ext|greek|greek-ext|vietnamese)-[a-z]+-normal-[^/]*\.woff2$/;
 
 const hash = createHash('sha256');
 for (const f of files) hash.update(`${f}\n`).update(readFileSync(join(root, f)));
 const version = hash.digest('hex').slice(0, 8);
 
-const shell = ['./', ...files.map((f) => `./${f}`)];
+const shell = ['./', ...files.filter((f) => !OTHER_SCRIPTS.test(f)).map((f) => `./${f}`)];
 const sw = read('sw.js')
   .replace(/(\/\/ build:version\n)[\s\S]*?(\n\/\/ \/build:version)/, `$1const VERSION = '${version}';$2`)
   .replace(/(\/\/ build:shell\n)[\s\S]*?(\n\/\/ \/build:shell)/, `$1const SHELL = [\n${shell.map((u) => `  '${u}'`).join(',\n')}\n];$2`);

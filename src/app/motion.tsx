@@ -5,7 +5,10 @@ import { useLocation } from 'react-router-dom';
 import { prefersReducedMotion } from '../lib/util';
 
 // How deep each screen sits.
-const DEPTH: Record<string, number> = { home: 0, account: 1, import: 1, trip: 1, edit: 2, members: 2, checklist: 2, expenses: 2 };
+const DEPTH: Record<string, number> = {
+  home: 0, account: 1, import: 1, new: 1, trip: 1,
+  edit: 2, members: 2, checklist: 2, expenses: 2, tickets: 2, ideas: 2, polls: 2, journal: 2, recap: 2, sos: 2,
+};
 export const screenOf = (pathname: string): string => pathname.split('/')[1] || 'home';
 
 export interface NavMotion {
@@ -68,4 +71,35 @@ export function useReveal(ref: React.RefObject<HTMLElement>, selector: string, r
       { duration: 560, delay: 60 + i * 45, easing: 'cubic-bezier(.32, .72, 0, 1)', fill: 'backwards' },
     ));
   });
+}
+
+/**
+ * For live lists (checklist, expenses): which items arrived after the list first appeared, so
+ * just those can slide in. The first batch is left to useReveal.
+ */
+export function useNewItems(ids: string[] | null): (id: string) => boolean {
+  const known = useRef<Set<string> | null>(null);
+  const fresh = useRef(new Set<string>());
+  if (ids) {
+    if (!known.current) known.current = new Set(ids);
+    else for (const id of ids) if (!known.current.has(id)) { known.current.add(id); fresh.current.add(id); }
+  }
+  return (id) => fresh.current.has(id);
+}
+
+/**
+ * Removing an item from a list: it slides away first, then `remove` runs. Returns the ids on
+ * their way out (give them the 'leaving' class) and the function that starts it.
+ */
+export function useLeaving(): [Set<string>, (id: string, remove: () => Promise<unknown>) => Promise<void>] {
+  const [leaving, setLeaving] = useState<Set<string>>(() => new Set());
+  const start = async (id: string, remove: () => Promise<unknown>) => {
+    setLeaving((s) => new Set(s).add(id));
+    await new Promise((r) => setTimeout(r, prefersReducedMotion() ? 0 : 220));
+    try { await remove(); } finally {
+      // Gone from the list now (or it failed and stays): either way it's no longer leaving.
+      setLeaving((s) => { const n = new Set(s); n.delete(id); return n; });
+    }
+  };
+  return [leaving, start];
 }

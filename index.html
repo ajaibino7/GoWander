@@ -14,6 +14,17 @@
   <meta name="apple-mobile-web-app-title" content="GoWander">
   <meta name="application-name" content="GoWander">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- Stylesheets linked here (not imported from main.tsx), so the first paint below is styled
+       in development too; Vite bundles them for the build. Leaflet's first, so ours win. -->
+  <link rel="stylesheet" href="/node_modules/leaflet/dist/leaflet.css">
+  <!-- Lato, bundled with the app (no third-party request; cached for offline use): regular for
+       text, bold for labels and headings, black for big titles and numbers. -->
+  <link rel="stylesheet" href="/node_modules/@fontsource/lato/400.css">
+  <link rel="stylesheet" href="/node_modules/@fontsource/lato/700.css">
+  <link rel="stylesheet" href="/node_modules/@fontsource/lato/900.css">
+  <link rel="stylesheet" href="/src/styles/styles.css">
+  <link rel="stylesheet" href="/src/styles/app.css">
+  <link rel="stylesheet" href="/src/styles/features.css">
 </head>
 <body>
   <div id="root">
@@ -59,10 +70,31 @@
       </section>
     </main>
     <script>
-      // A link straight to a trip or another page gets a plain header instead.
       (function () {
-        if (!/^#?\/?$/.test(location.hash)) {
-          document.querySelector('.hero').classList.remove('home');
+        // Hint saved by the app (src/app/bootCache.ts): is there a snapshot of last visit's home
+        // screen, and when is each trip happening?
+        var hint = null;
+        try { hint = JSON.parse(localStorage.getItem('gw-boot-hint') || 'null'); } catch (e) { /* unavailable */ }
+        var home = /^#?\/?$/.test(location.hash);
+        var testMode = /[?&](test|now|lat|speed|follow)(=|&|$)/.test(location.search);
+        // Opening the app during a trip goes straight to that trip (test mode opens the sample).
+        if (home && hint && hint.signedIn && !testMode) {
+          var now = Date.now();
+          for (var i = 0; i < (hint.live || []).length; i++) {
+            var w = hint.live[i];
+            if (now >= w[1] && now < w[2]) {
+              history.replaceState(null, '', location.pathname + location.search + '#/trip/' + encodeURIComponent(w[0]));
+              home = false;
+              break;
+            }
+          }
+        }
+        if (!home) {
+          // A link straight to a trip or another page gets a plain header instead.
+          var hero = document.querySelector('.hero');
+          hero.classList.remove('home');
+          // A trip's pages have a taller header (room for its photo): same height from the start.
+          if (/^#\/(trip|members|checklist|expenses|edit)\/(?!new(?:[/?]|$))./.test(location.hash)) hero.classList.add('trip');
           document.querySelector('.hero h1').textContent = '';
           document.querySelector('.hero-desc').hidden = true;
           document.getElementById('view-home').hidden = true;
@@ -70,6 +102,8 @@
         }
         // Tells the app its first header doesn't need to play the logo's entrance again.
         document.documentElement.dataset.staticPaint = 'home';
+        // The app will draw last visit's trips on its first frame: no placeholder cards meanwhile.
+        if (hint) document.querySelector('.home-skel').style.visibility = 'hidden';
       })();
     </script>
   </div>

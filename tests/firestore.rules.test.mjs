@@ -23,7 +23,8 @@ const trip = (u) => doc(db(u), 'trips', 't1');
 
 before(async () => {
   env = await initializeTestEnvironment({
-    projectId: 'demo-trips',
+    // Its own project, so running these never wipes the app's own emulator data (demo-trips).
+    projectId: 'demo-rules-test',
     firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8081 },
   });
 });
@@ -332,6 +333,140 @@ test('payer and split must be trip members, and amounts must be sensible', async
   await assertFails(setDoc(exp(OWNER), newExp(OWNER, { currency: 'rupees' })));
   await assertFails(setDoc(exp(OWNER), newExp(OWNER, { kind: 'gift' })));
   await assertFails(setDoc(exp(OWNER), newExp(OWNER, { junk: 1 })));
+});
+
+test('expenses can have a category, a split by amount and a bill photo flag', async () => {
+  await addFriend();
+  await assertSucceeds(setDoc(exp(OWNER), newExp(OWNER, { category: 'food', shares: { [OWNER.email]: 800, [FRIEND.email]: 400 }, hasBill: true })));
+  await assertFails(setDoc(exp(OWNER, 'e2'), newExp(OWNER, { category: 'gifts' })));
+  await assertFails(setDoc(exp(OWNER, 'e3'), newExp(OWNER, { shares: { [STRANGER.email]: 1200 } })));
+  await assertFails(setDoc(exp(OWNER, 'e4'), newExp(OWNER, { hasBill: 'yes' })));
+});
+
+/* ---------- photos (bills, journal) ---------- */
+const photo = (u, id = 'bill-e1') => doc(db(u), 'trips', 't1', 'photos', id);
+const newPhoto = (u, data = img()) => ({ data, createdBy: u.email, createdAt: serverTimestamp() });
+
+test('members store, read and remove photos; strangers cannot', async () => {
+  await addFriend();
+  await assertSucceeds(setDoc(photo(FRIEND), newPhoto(FRIEND)));
+  await assertSucceeds(getDoc(photo(OWNER)));
+  await assertFails(getDoc(photo(STRANGER)));
+  await assertFails(setDoc(photo(STRANGER, 'j-x'), newPhoto(STRANGER)));
+  await assertSucceeds(deleteDoc(photo(OWNER)));
+});
+test('photos must be small images with a known id', async () => {
+  await assertFails(setDoc(photo(OWNER), newPhoto(OWNER, img(420001))));
+  await assertFails(setDoc(photo(OWNER), newPhoto(OWNER, 'data:text/html;base64,PHNjcmlwdD4=')));
+  await assertFails(setDoc(photo(OWNER, 'avatar'), newPhoto(OWNER)));
+  await assertFails(setDoc(photo(OWNER), { ...newPhoto(OWNER), createdBy: FRIEND.email }));
+});
+
+/* ---------- ideas board ---------- */
+const idea = (u, id = 'd1') => doc(db(u), 'trips', 't1', 'ideas', id);
+const newIdea = (u, extra = {}) => ({ title: 'Chapora Fort', note: '', place: null, link: '', likes: [], createdBy: u.email, createdAt: serverTimestamp(), ...stamp(u), ...extra });
+
+test('members add ideas and like them, changing only their own like', async () => {
+  await makeViewer(); // a view-only member still shares ideas
+  await assertSucceeds(setDoc(idea(FRIEND, 'd2'), newIdea(FRIEND)));
+  await setDoc(idea(OWNER), newIdea(OWNER, { likes: [] }));
+  await assertSucceeds(updateDoc(idea(OWNER), { likes: [OWNER.email], ...stamp(OWNER) }));
+  await assertSucceeds(updateDoc(idea(FRIEND), { likes: [OWNER.email, FRIEND.email], ...stamp(FRIEND) }));
+  await assertFails(updateDoc(idea(FRIEND), { likes: [FRIEND.email], ...stamp(FRIEND) })); // removing someone else's like
+  await assertFails(updateDoc(idea(FRIEND), { title: 'Renamed', ...stamp(FRIEND) })); // not theirs to edit
+  await assertFails(getDoc(idea(STRANGER)));
+});
+test('only the author or an editor changes or removes an idea', async () => {
+  await makeViewer();
+  await setDoc(idea(OWNER), newIdea(OWNER));
+  await assertFails(updateDoc(idea(FRIEND), { title: 'Mine now', ...stamp(FRIEND) }));
+  await assertFails(deleteDoc(idea(FRIEND)));
+  await assertSucceeds(deleteDoc(idea(OWNER)));
+});
+
+/* ---------- polls ---------- */
+const poll = (u, id = 'p1') => doc(db(u), 'trips', 't1', 'polls', id);
+const opts = [{ id: 'a', text: 'Thalassa', place: null }, { id: 'b', text: "Fisherman's Wharf", place: null }];
+const newPoll = (u, extra = {}) => ({ question: 'Dinner?', options: opts, votes: {}, dayDate: '', closed: false, createdBy: u.email, createdAt: serverTimestamp(), ...stamp(u), ...extra });
+
+test('members vote, changing only their own vote', async () => {
+  await makeViewer();
+  await setDoc(poll(OWNER), newPoll(OWNER));
+  await assertSucceeds(updateDoc(poll(FRIEND), { votes: { [FRIEND.email]: 'a' }, ...stamp(FRIEND) }));
+  await assertFails(updateDoc(poll(FRIEND), { votes: { [FRIEND.email]: 'a', [OWNER.email]: 'b' }, ...stamp(FRIEND) }));
+  await assertFails(updateDoc(poll(FRIEND), { closed: true, ...stamp(FRIEND) })); // only the starter or an editor closes it
+  await assertSucceeds(updateDoc(poll(OWNER), { closed: true, ...stamp(OWNER) }));
+  await assertFails(updateDoc(poll(FRIEND), { votes: { [FRIEND.email]: 'b' }, ...stamp(FRIEND) })); // closed
+});
+test('polls need a question and 2–8 options, and strangers stay out', async () => {
+  await assertFails(setDoc(poll(OWNER), newPoll(OWNER, { options: [opts[0]] })));
+  await assertFails(setDoc(poll(OWNER), newPoll(OWNER, { question: '' })));
+  await assertFails(setDoc(poll(OWNER), newPoll(OWNER, { votes: { [OWNER.email]: 'a' } })));
+  await setDoc(poll(OWNER), newPoll(OWNER));
+  await assertFails(getDoc(poll(STRANGER)));
+});
+
+/* ---------- budget, profiles (UPI), live locations ---------- */
+test('editors set the budget; view-only members only read it', async () => {
+  await makeViewer();
+  const budget = (u) => doc(db(u), 'trips', 't1', 'settings', 'budget');
+  await assertSucceeds(setDoc(budget(OWNER), { perPerson: 15000, currency: 'INR', ...stamp(OWNER) }));
+  await assertSucceeds(getDoc(budget(FRIEND)));
+  await assertFails(setDoc(budget(FRIEND), { perPerson: 1, currency: 'INR', ...stamp(FRIEND) }));
+  await assertFails(setDoc(budget(OWNER), { perPerson: -5, currency: 'INR', ...stamp(OWNER) }));
+});
+test('members set only their own UPI ID, and it must look like one', async () => {
+  await addFriend();
+  const prof = (u, email) => doc(db(u), 'trips', 't1', 'profiles', email);
+  await assertSucceeds(setDoc(prof(FRIEND, FRIEND.email), { upi: 'friend@okicici', updatedAt: serverTimestamp() }));
+  await assertSucceeds(getDoc(prof(OWNER, FRIEND.email)));
+  await assertFails(setDoc(prof(FRIEND, OWNER.email), { upi: 'thief@okicici', updatedAt: serverTimestamp() }));
+  await assertFails(setDoc(prof(FRIEND, FRIEND.email), { upi: 'not a upi id', updatedAt: serverTimestamp() }));
+  await assertFails(getDoc(prof(STRANGER, FRIEND.email)));
+});
+test('members set only their own nickname, and keep it short', async () => {
+  await addFriend();
+  const prof = (u, email) => doc(db(u), 'trips', 't1', 'profiles', email);
+  await assertSucceeds(setDoc(prof(FRIEND, FRIEND.email), { nickname: 'Fizz', updatedAt: serverTimestamp() }));
+  await assertSucceeds(setDoc(prof(FRIEND, FRIEND.email), { nickname: 'Fizz', upi: 'friend@okicici', updatedAt: serverTimestamp() }));
+  await assertSucceeds(getDoc(prof(OWNER, FRIEND.email)));
+  await assertFails(setDoc(prof(OWNER, FRIEND.email), { nickname: 'Not you', updatedAt: serverTimestamp() }));
+  await assertFails(setDoc(prof(FRIEND, FRIEND.email), { nickname: 'x'.repeat(31), updatedAt: serverTimestamp() }));
+  await assertFails(setDoc(prof(FRIEND, FRIEND.email), { nickname: 7, updatedAt: serverTimestamp() }));
+});
+test('members share only their own location, and can stop', async () => {
+  await addFriend();
+  const loc = (u, email) => doc(db(u), 'trips', 't1', 'locations', email);
+  const here = { lat: 15.5, lng: 73.8, accuracy: 20, untilMs: Date.now() + 3600000, updatedAt: serverTimestamp() };
+  await assertSucceeds(setDoc(loc(FRIEND, FRIEND.email), here));
+  await assertSucceeds(getDoc(loc(OWNER, FRIEND.email)));
+  await assertFails(setDoc(loc(FRIEND, OWNER.email), here));
+  await assertFails(setDoc(loc(FRIEND, FRIEND.email), { ...here, lat: 123 }));
+  await assertFails(getDoc(loc(STRANGER, FRIEND.email)));
+  await assertSucceeds(deleteDoc(loc(FRIEND, FRIEND.email)));
+});
+
+/* ---------- journal and reviews ---------- */
+test('members write their own journal entries; only the author edits them', async () => {
+  await addFriend();
+  const entry = (u) => doc(db(u), 'trips', 't1', 'journal', 'j1');
+  const e = { dayDate: '2026-10-17', stopId: 's1', text: 'Best sunset ever', hasPhoto: false, createdBy: FRIEND.email, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+  await assertSucceeds(setDoc(entry(FRIEND), e));
+  await assertFails(updateDoc(entry(OWNER), { text: 'Edited by someone else', updatedAt: serverTimestamp() }));
+  await assertSucceeds(updateDoc(entry(FRIEND), { text: 'Best sunset of the trip', updatedAt: serverTimestamp() }));
+  await assertFails(setDoc(doc(db(OWNER), 'trips', 't1', 'journal', 'j2'), { ...e, createdBy: OWNER.email, text: '' }));
+  await assertSucceeds(deleteDoc(entry(OWNER))); // the owner can tidy up
+});
+test('one review per member per stop, written only by them', async () => {
+  await addFriend();
+  const review = (u, id) => doc(db(u), 'trips', 't1', 'reviews', id);
+  const r = (email, extra = {}) => ({ stopId: 's1', email, vote: 1, note: '', updatedAt: serverTimestamp(), ...extra });
+  await assertSucceeds(setDoc(review(FRIEND, `s1__${FRIEND.email}`), r(FRIEND.email)));
+  await assertSucceeds(setDoc(review(FRIEND, `s1__${FRIEND.email}`), r(FRIEND.email, { vote: -1, note: 'Too crowded' })));
+  await assertFails(setDoc(review(FRIEND, `s1__${OWNER.email}`), r(OWNER.email)));
+  await assertFails(setDoc(review(FRIEND, `s2__${FRIEND.email}`), r(FRIEND.email)));
+  await assertFails(setDoc(review(FRIEND, `s1__${FRIEND.email}`), r(FRIEND.email, { vote: 5 })));
+  await assertFails(getDoc(review(STRANGER, `s1__${FRIEND.email}`)));
 });
 
 /* ---------- deleting ---------- */

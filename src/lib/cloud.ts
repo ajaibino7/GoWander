@@ -6,11 +6,15 @@ import type { DocumentData, DocumentSnapshot, Firestore, Timestamp, Unsubscribe 
 import { firebaseConfig } from './firebase-config';
 import { normalizeTrip } from './store';
 import type {
-  ChecklistItem, ChecklistList, DraftTrip, Expense, ExpenseInput, Role, Trip, TripEntry, User,
+  Budget, ChecklistItem, ChecklistList, DraftTrip, Expense, ExpenseCategory, ExpenseInput, Idea, JournalEntry, MemberLocation,
+  Place, Poll, PollOption, Profile, Review, Role, Trip, TripEntry, User,
 } from './types';
 
 // Local development against the Firebase emulators: add ?emulator on localhost.
 const useEmulator = new URLSearchParams(location.search).has('emulator') && ['localhost', '127.0.0.1'].includes(location.hostname);
+// Development: Firebase can only be set up once per page, so editing this file reloads the page
+// instead of swapping the module in place.
+if (import.meta.hot) import.meta.hot.accept(() => location.reload());
 export const available = (): boolean => useEmulator || !!(firebaseConfig.apiKey && firebaseConfig.projectId);
 export const emulatorMode = useEmulator;
 
@@ -275,7 +279,7 @@ export async function deleteTrip(id: string): Promise<void> {
   try { await commit(F.deleteDoc(F.doc(db, 'trips', id, 'state', 'progress'))); } catch { /* no progress yet */ }
   try { await commit(F.deleteDoc(F.doc(db, 'trips', id, 'media', 'cover'))); } catch { /* no cover */ }
   // Firestore keeps a deleted document's subcollections, so clear the shared lists first.
-  for (const sub of ['checklist', 'expenses']) {
+  for (const sub of ['checklist', 'expenses', 'photos', 'ideas', 'polls', 'settings', 'profiles', 'locations', 'journal', 'reviews']) {
     try {
       const snap = await F.getDocs(F.collection(db, 'trips', id, sub));
       await Promise.all(snap.docs.map((d) => commit(F.deleteDoc(d.ref))));
@@ -333,9 +337,19 @@ function toExpense(id: string, d: DocumentData): Expense {
     split: strList(d.split),
     date: String(d.date || ''),
     kind: d.kind === 'settlement' ? 'settlement' : 'expense',
+    category: CATEGORIES.includes(d.category) ? d.category : undefined,
+    shares: sharesOf(d.shares),
+    hasBill: d.hasBill === true,
     createdBy: String(d.createdBy || ''),
     createdMs: toMs(d.createdAt),
   };
+}
+const CATEGORIES: ExpenseCategory[] = ['food', 'travel', 'stay', 'tickets', 'shopping', 'other'];
+function sharesOf(v: unknown): Record<string, number> | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const out: Record<string, number> = {};
+  for (const [k, n] of Object.entries(v as Record<string, unknown>)) if (typeof n === 'number' && n >= 0) out[k] = n;
+  return Object.keys(out).length ? out : undefined;
 }
 
 export function watchChecklist(id: string, cb: (items: ChecklistItem[]) => void, onError?: (msg: string) => void): Promise<Unsubscribe> {
@@ -374,13 +388,21 @@ export async function updateChecklistItem(user: User, id: string, itemId: string
   await commit(F.updateDoc(F.doc(db, 'trips', id, 'checklist', itemId), { ...fields, updatedBy: user.email, updatedAt: F.serverTimestamp() }));
 }
 
-// Pass expenseId to edit an existing expense.
-export async function saveExpense(user: User, id: string, expense: ExpenseInput, expenseId: string | null = null): Promise<void> {
+// Pass expenseId to edit an existing expense. Resolves with the expense's id. Optional fields
+// that are unset are removed (an expense switched back to an equal split loses its shares).
+export async function saveExpense(user: User, id: string, expense: ExpenseInput, expenseId: string | null = null): Promise<string> {
   const { db, F } = await init();
   const stamp = { updatedBy: user.email, updatedAt: F.serverTimestamp() };
-  await commit(expenseId
-    ? F.updateDoc(F.doc(db, 'trips', id, 'expenses', expenseId), { ...expense, ...stamp })
-    : F.addDoc(F.collection(db, 'trips', id, 'expenses'), { ...expense, createdBy: user.email, createdAt: F.serverTimestamp(), ...stamp }));
+  const data: Record<string, any> = { ...expense, ...stamp }; // eslint-disable-line @typescript-eslint/no-explicit-any
+  for (const k of ['category', 'shares', 'hasBill'] as const) if (expense[k] === undefined) data[k] = expenseId ? F.deleteField() : undefined;
+  for (const k of Object.keys(data)) if (data[k] === undefined) delete data[k];
+  if (expenseId) {
+    await commit(F.updateDoc(F.doc(db, 'trips', id, 'expenses', expenseId), data));
+    return expenseId;
+  }
+  const ref = F.doc(F.collection(db, 'trips', id, 'expenses'));
+  await commit(F.setDoc(ref, { ...data, createdBy: user.email, createdAt: F.serverTimestamp() }));
+  return ref.id;
 }
 
 export async function deleteListItem(id: string, sub: 'checklist' | 'expenses', itemId: string): Promise<void> {
@@ -410,4 +432,168 @@ export async function setStopDone(user: User, id: string, stopId: string, on: bo
     updatedBy: user.email,
     updatedAt: F.serverTimestamp(),
   }, { merge: true }));
+}
+
+/* ============================================================
+   Planning together, on the go, and memories — one small document per idea, poll, journal
+   entry, review or location, so members never overwrite each other. All work offline.
+   ============================================================ */
+const placeOf = (v: unknown): Place | null => {
+  if (!v || typeof v !== 'object') return null;
+  const p = v as Record<string, unknown>;
+  const lat = Number(p.lat), lng = Number(p.lng);
+  if (!(lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180)) return null;
+  return { name: String(p.name || 'Pinned place').slice(0, 160), lat, lng, radius: Number(p.radius) || 300 };
+};
+const plainPlace = (p: Place | null) => (p ? { name: p.name, lat: p.lat, lng: p.lng, radius: p.radius } : null);
+
+/* ---------- photos (bills, journal) ---------- */
+export async function setPhoto(user: User, id: string, photoId: string, dataUrl: string): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.setDoc(F.doc(db, 'trips', id, 'photos', photoId), { data: dataUrl, createdBy: user.email, createdAt: F.serverTimestamp() }));
+}
+// One-off read (from the offline copy when there's no signal). null when there's none.
+export async function getPhoto(id: string, photoId: string): Promise<string | null> {
+  const { db, F } = await init();
+  try {
+    const snap = await F.getDoc(F.doc(db, 'trips', id, 'photos', photoId));
+    const v = snap.data()?.data;
+    return typeof v === 'string' ? v : null;
+  } catch { return null; }
+}
+export async function deletePhoto(id: string, photoId: string): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.deleteDoc(F.doc(db, 'trips', id, 'photos', photoId)));
+}
+
+/* ---------- ideas board ---------- */
+export function watchIdeas(id: string, cb: (items: Idea[]) => void, onError?: (msg: string) => void): Promise<Unsubscribe> {
+  return watchCollection(id, 'ideas', (docs) => cb(docs.map(([k, d]): Idea => ({
+    id: k, title: String(d.title || ''), note: String(d.note || ''), place: placeOf(d.place), link: String(d.link || ''),
+    likes: strList(d.likes), createdBy: String(d.createdBy || ''), createdMs: toMs(d.createdAt),
+  }))), onError);
+}
+export async function saveIdea(user: User, id: string, idea: Pick<Idea, 'title' | 'note' | 'place' | 'link'>, ideaId: string | null = null): Promise<void> {
+  const { db, F } = await init();
+  const data = { title: idea.title, note: idea.note, place: plainPlace(idea.place), link: idea.link, updatedBy: user.email, updatedAt: F.serverTimestamp() };
+  await commit(ideaId
+    ? F.updateDoc(F.doc(db, 'trips', id, 'ideas', ideaId), data)
+    : F.addDoc(F.collection(db, 'trips', id, 'ideas'), { ...data, likes: [], createdBy: user.email, createdAt: F.serverTimestamp() }));
+}
+export async function likeIdea(user: User, id: string, ideaId: string, on: boolean): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.updateDoc(F.doc(db, 'trips', id, 'ideas', ideaId), {
+    likes: on ? F.arrayUnion(user.email) : F.arrayRemove(user.email), updatedBy: user.email, updatedAt: F.serverTimestamp(),
+  }));
+}
+
+/* ---------- polls ---------- */
+export function watchPolls(id: string, cb: (items: Poll[]) => void, onError?: (msg: string) => void): Promise<Unsubscribe> {
+  return watchCollection(id, 'polls', (docs) => cb(docs.map(([k, d]): Poll => ({
+    id: k,
+    question: String(d.question || ''),
+    options: (Array.isArray(d.options) ? d.options as Record<string, unknown>[] : [])
+      .map((o): PollOption => ({ id: String(o.id || ''), text: String(o.text || ''), place: placeOf(o.place) })),
+    votes: Object.fromEntries(Object.entries(d.votes && typeof d.votes === 'object' ? d.votes as Record<string, unknown> : {})
+      .filter((e): e is [string, string] => typeof e[1] === 'string')),
+    dayDate: String(d.dayDate || ''),
+    closed: d.closed === true,
+    createdBy: String(d.createdBy || ''),
+    createdMs: toMs(d.createdAt),
+  }))), onError);
+}
+export async function createPoll(user: User, id: string, poll: Pick<Poll, 'question' | 'options' | 'dayDate'>): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.addDoc(F.collection(db, 'trips', id, 'polls'), {
+    question: poll.question, options: poll.options.map((o) => ({ id: o.id, text: o.text, place: plainPlace(o.place) })), votes: {},
+    dayDate: poll.dayDate, closed: false, createdBy: user.email, createdAt: F.serverTimestamp(), updatedBy: user.email, updatedAt: F.serverTimestamp(),
+  }));
+}
+// optionId null takes your vote back. (A FieldPath, because emails contain dots.)
+export async function votePoll(user: User, id: string, pollId: string, optionId: string | null): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.updateDoc(F.doc(db, 'trips', id, 'polls', pollId),
+    new F.FieldPath('votes', user.email), optionId ?? F.deleteField(),
+    'updatedBy', user.email, 'updatedAt', F.serverTimestamp()));
+}
+export async function closePoll(user: User, id: string, pollId: string, closed: boolean): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.updateDoc(F.doc(db, 'trips', id, 'polls', pollId), { closed, updatedBy: user.email, updatedAt: F.serverTimestamp() }));
+}
+
+/* ---------- budget and UPI IDs ---------- */
+export async function watchBudget(id: string, cb: (b: Budget | null) => void): Promise<Unsubscribe> {
+  const { db, F } = await init();
+  return F.onSnapshot(F.doc(db, 'trips', id, 'settings', 'budget'),
+    (snap) => { const d = snap.data(); cb(d && typeof d.perPerson === 'number' ? { perPerson: d.perPerson, currency: String(d.currency || 'INR') } : null); },
+    () => cb(null));
+}
+export async function setBudget(user: User, id: string, b: Budget | null): Promise<void> {
+  const { db, F } = await init();
+  const ref = F.doc(db, 'trips', id, 'settings', 'budget');
+  await commit(b ? F.setDoc(ref, { ...b, updatedBy: user.email, updatedAt: F.serverTimestamp() }) : F.deleteDoc(ref));
+}
+export function watchProfiles(id: string, cb: (p: Map<string, Profile>) => void): Promise<Unsubscribe> {
+  return watchCollection(id, 'profiles', (docs) => cb(new Map(docs.map(([email, d]) => [email, { email, upi: String(d.upi || ''), nickname: String(d.nickname || '') }]))));
+}
+// Merged, so saving your nickname keeps your UPI ID and the other way round.
+export async function setMyProfile(user: User, id: string, fields: { upi?: string; nickname?: string }): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.setDoc(F.doc(db, 'trips', id, 'profiles', user.email), { ...fields, updatedAt: F.serverTimestamp() }, { merge: true }));
+}
+
+/* ---------- where's everyone ---------- */
+export function watchLocations(id: string, cb: (l: MemberLocation[]) => void): Promise<Unsubscribe> {
+  return watchCollection(id, 'locations', (docs) => cb(docs.map(([email, d]): MemberLocation => ({
+    email, lat: Number(d.lat), lng: Number(d.lng), accuracy: Number(d.accuracy) || 0, atMs: toMs(d.updatedAt), untilMs: Number(d.untilMs) || 0,
+  })).filter((l) => Number.isFinite(l.lat) && Number.isFinite(l.lng))));
+}
+export async function shareLocation(user: User, id: string, pos: { lat: number; lng: number; accuracy?: number }, untilMs: number): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.setDoc(F.doc(db, 'trips', id, 'locations', user.email), {
+    lat: Number(pos.lat.toFixed(5)), lng: Number(pos.lng.toFixed(5)), accuracy: Math.round(pos.accuracy || 0), untilMs, updatedAt: F.serverTimestamp(),
+  }));
+}
+export async function stopSharingLocation(user: User, id: string): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.deleteDoc(F.doc(db, 'trips', id, 'locations', user.email)));
+}
+
+/* ---------- journal ---------- */
+export function watchJournal(id: string, cb: (items: JournalEntry[]) => void, onError?: (msg: string) => void): Promise<Unsubscribe> {
+  return watchCollection(id, 'journal', (docs) => cb(docs.map(([k, d]): JournalEntry => ({
+    id: k, dayDate: String(d.dayDate || ''), stopId: String(d.stopId || ''), text: String(d.text || ''), hasPhoto: d.hasPhoto === true,
+    createdBy: String(d.createdBy || ''), createdMs: toMs(d.createdAt),
+  }))), onError);
+}
+// Resolves with the entry's id (new entries get one before saving, so a photo can go with it).
+export async function saveJournal(user: User, id: string, e: Pick<JournalEntry, 'dayDate' | 'stopId' | 'text' | 'hasPhoto'>, entryId: string | null = null): Promise<string> {
+  const { db, F } = await init();
+  const data = { dayDate: e.dayDate, stopId: e.stopId, text: e.text, hasPhoto: e.hasPhoto, updatedAt: F.serverTimestamp() };
+  if (entryId) {
+    await commit(F.updateDoc(F.doc(db, 'trips', id, 'journal', entryId), data));
+    return entryId;
+  }
+  const ref = F.doc(F.collection(db, 'trips', id, 'journal'));
+  await commit(F.setDoc(ref, { ...data, createdBy: user.email, createdAt: F.serverTimestamp() }));
+  return ref.id;
+}
+
+/* ---------- reviews ---------- */
+export function watchReviews(id: string, cb: (items: Review[]) => void): Promise<Unsubscribe> {
+  return watchCollection(id, 'reviews', (docs) => cb(docs.map(([, d]): Review => ({
+    stopId: String(d.stopId || ''), email: String(d.email || ''), vote: d.vote === -1 ? -1 : 1, note: String(d.note || ''),
+  }))));
+}
+// vote null removes your review.
+export async function setReview(user: User, id: string, stopId: string, vote: 1 | -1 | null, note = ''): Promise<void> {
+  const { db, F } = await init();
+  const ref = F.doc(db, 'trips', id, 'reviews', `${stopId}__${user.email}`);
+  await commit(vote ? F.setDoc(ref, { stopId, email: user.email, vote, note, updatedAt: F.serverTimestamp() }) : F.deleteDoc(ref));
+}
+
+/** Removes an idea, poll or journal entry. */
+export async function deleteSubDoc(id: string, sub: 'ideas' | 'polls' | 'journal', docId: string): Promise<void> {
+  const { db, F } = await init();
+  await commit(F.deleteDoc(F.doc(db, 'trips', id, sub, docId)));
 }

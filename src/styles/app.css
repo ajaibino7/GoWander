@@ -4,7 +4,7 @@
 .small { font-size: 13px; }
 .fine { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
 .fine code, .ed-card code { background: var(--surface-2); padding: 1px 5px; border-radius: 5px; font-size: 12px; }
-.sec-h { font-family: var(--serif); font-weight: normal; font-size: 20px; margin: 0 0 4px; }
+.sec-h { font-family: var(--serif); font-weight: 700; font-size: 20px; margin: 0 0 4px; }
 .btn.small { padding: 6px 11px; font-size: 13px; }
 .btn.wide { width: 100%; justify-content: center; }
 .btn.danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, var(--line)); }
@@ -55,7 +55,7 @@
   display: grid; justify-items: center; line-height: 1; min-width: 48px; padding: 7px 8px 6px; border-radius: 12px;
   background: rgba(255, 255, 255, .94); color: var(--navy); box-shadow: 0 4px 12px rgba(0, 0, 0, .15);
 }
-.tc-date b { font-family: var(--serif); font-size: 22px; font-weight: normal; }
+.tc-date b { font-family: var(--serif); font-size: 22px; font-weight: 900; }
 .tc-date span { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--coral-ink); margin-top: 3px; }
 .tc-banner .chip, .tc-banner .chip.st-soon { background: rgba(255, 255, 255, .92); color: var(--navy); box-shadow: 0 2px 8px rgba(0, 0, 0, .12); display: inline-flex; align-items: center; gap: 6px; }
 .tc-banner .chip.st-live { background: var(--coral); color: #fff; }
@@ -63,7 +63,7 @@
 .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: blink 1.4s ease-in-out infinite; }
 @keyframes blink { 50% { opacity: .35; } }
 .tc-body { padding: 14px 16px 6px; }
-.trip-card h3 { font-family: var(--serif); font-weight: normal; font-size: 22px; margin: 0 0 8px; line-height: 1.2; overflow-wrap: anywhere; transition: color .15s; }
+.trip-card h3 { font-family: var(--serif); font-weight: 900; font-size: 22px; margin: 0 0 8px; line-height: 1.2; overflow-wrap: anywhere; transition: color .15s; }
 .tc-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); }
 .tc-meta span { display: inline-flex; align-items: center; gap: 5px; }
 .tc-meta .ic { width: 14px; height: 14px; color: var(--accent); }
@@ -93,7 +93,7 @@
 .badge.local { background: var(--surface-2); color: var(--muted); }
 .empty { grid-column: 1 / -1; text-align: center; padding: 40px 18px; background: var(--surface); border: 1px dashed var(--line); border-radius: 18px; }
 .empty-art { font-size: 40px; line-height: 1; margin-bottom: 10px; }
-.empty-t { font-family: var(--serif); font-size: 22px; }
+.empty-t { font-family: var(--serif); font-size: 22px; font-weight: 900; }
 .empty p { color: var(--muted); margin: 6px 0 0; }
 
 /* ---------- forms ---------- */
@@ -134,7 +134,7 @@
 .ed-errors ul { margin: 6px 0 0; padding-left: 18px; }
 .ed-day { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px; display: grid; gap: 10px; min-width: 0; }
 .ed-day-h { display: flex; align-items: center; gap: 8px; }
-.ed-day-h strong { font-family: var(--serif); font-size: 19px; font-weight: normal; }
+.ed-day-h strong { font-family: var(--serif); font-size: 19px; font-weight: 900; }
 .ed-day-h .icon-btn { margin-left: auto; }
 .ed-stops { display: grid; gap: 10px; }
 .ed-stop { border: 1px solid var(--line); border-left: 4px solid var(--sea); border-radius: 10px; padding: 10px; display: grid; gap: 8px; background: var(--bg); min-width: 0; }
@@ -181,6 +181,9 @@
 .ed-notes summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--muted); padding: 4px 0; }
 .ed-notes[open] { display: grid; gap: 8px; }
 .ed-note { display: grid; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: var(--bg); }
+/* A note's type, heading and ✕ stay on one line, even on a phone. */
+.ed-note > .ed-row { display: grid; grid-template-columns: minmax(96px, max-content) minmax(0, 1fr) auto; }
+.ed-note > .ed-row > select, .ed-note > .ed-row > input { width: 100%; min-width: 0; }
 .ed-more { display: flex; flex-wrap: wrap; gap: 8px; }
 .ed-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; display: flex; justify-content: flex-end; gap: 8px;
@@ -199,7 +202,7 @@
 .samples > summary .list-h { margin: 0; }
 .samples > summary:hover .muted { color: var(--ink); }
 .done-by { color: var(--ok); font-weight: 600; }
-.list-h { font-family: var(--serif); font-weight: normal; font-size: 19px; margin: 8px 0 -4px; }
+.list-h { font-family: var(--serif); font-weight: 900; font-size: 19px; margin: 8px 0 -4px; }
 .btn.google { background: #fff; color: #1f1f1f; border: 1px solid #dadce0; font-weight: 600; }
 .btn.google .g {
   display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-weight: 800; font-size: 13px;
@@ -239,7 +242,7 @@ body.modal-open { overflow: hidden; }
   border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, .4); padding: 14px; display: grid; gap: 10px;
 }
 .modal-h { display: flex; justify-content: space-between; align-items: center; }
-.modal-h strong { font-family: var(--serif); font-size: 20px; font-weight: normal; }
+.modal-h strong { font-family: var(--serif); font-size: 20px; font-weight: 700; }
 .modal-foot { display: flex; justify-content: flex-end; gap: 8px; }
 .pp-search { display: flex; gap: 6px; }
 .pp-results { display: grid; gap: 4px; max-height: 210px; overflow: auto; }
@@ -339,7 +342,7 @@ body:has(.ed-bar) .toaster { bottom: calc(80px + env(safe-area-inset-bottom)); }
 .ex-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .ex-stats .stat { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; min-width: 0; }
 .ex-stats .k { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
-.ex-stats .v { font-family: var(--serif); font-size: 21px; margin-top: 2px; overflow-wrap: anywhere; }
+.ex-stats .v { font-family: var(--serif); font-size: 21px; font-weight: 900; margin-top: 2px; overflow-wrap: anywhere; }
 .ex-stats .stat.pos .v, .ex-bal .pos { color: var(--ok); }
 .ex-stats .stat.neg .v, .ex-bal .neg { color: var(--bad); }
 .ex-bal, .ex-moves, .ex-list { list-style: none; margin: 0; padding: 0; display: grid; }
@@ -420,7 +423,6 @@ html { -webkit-tap-highlight-color: transparent; }
 }
 .trip-card { transition: transform .4s var(--spring), box-shadow .4s var(--spring); }
 .trip-card:active { transform: scale(.98); transition-duration: .12s; }
-.tl { transition: background-color .25s; }
 .tl:active { background: var(--surface-2); }
 
 /* Opening a stop eases its buttons in; the nearby panel and expanded content slide up softly. */
@@ -455,6 +457,39 @@ html { -webkit-tap-highlight-color: transparent; }
 /* Numbers and bars that change glide instead of jumping. */
 .cl-bar span, .progress span { transition: width .6s var(--spring); }
 
+/* Photos fade in once loaded (and settle from a slight zoom) instead of popping in. */
+.fade-img { opacity: 0; transform: scale(1.04); transition: opacity .6s ease, transform 1.2s var(--spring); }
+.fade-img.on { opacity: 1; transform: none; }
+.fade-img.instant { transition: none; }
+.tc-banner { overflow: hidden; }
+.tc-banner > .tc-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
+/* Hovering a trip card drifts its photo closer. */
+.trip-card:hover .tc-photo.on { transform: scale(1.05); transition: transform 1.2s var(--spring); }
+
+/* Things that arrive a moment later — weather, travel times, "done by", the map — fade in
+   rather than appearing with a jolt. */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.tw, .day-wx, .m-wx, .done-by, .hero-who { animation: fade-in .5s ease both; }
+.hero-pill { animation: fade-up .6s var(--spring) .1s both; }
+.leaflet-container { animation: fade-in .5s ease both; }
+
+/* The status pill pops when the trip's state changes (on track → running behind, …). */
+@keyframes pill-in { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: none; } }
+.status-card .pill { animation: pill-in .5s var(--spring-pop) both; }
+
+/* Ticking off a stop: it eases to faded, its dot fills in with a little bounce. */
+.tl { transition: background-color .25s, opacity .4s ease; }
+.tl .d { transition: background-color .3s, border-color .3s, transform .4s var(--spring-pop); }
+
+/* Live lists: an item someone adds slides in; a removed one slides away before it goes. */
+@keyframes item-in { from { opacity: 0; transform: translate3d(0, -6px, 0) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes item-out { to { opacity: 0; transform: translate3d(24px, 0, 0); } }
+.fresh { animation: item-in .45s var(--spring) both; }
+.leaving { animation: item-out .22s ease forwards; pointer-events: none; }
+
+/* Nearby places ripple in, one after another (index set as --i). */
+.nb-list > li { animation: fade-up .45s var(--spring) both; animation-delay: calc(var(--i, 0) * 30ms); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important;
@@ -469,3 +504,65 @@ html { -webkit-tap-highlight-color: transparent; }
 .role-line .role-sel { justify-self: start; font-size: 13px; padding: 6px 10px; }
 .add-member .role-sel { flex: 0 0 auto; border-radius: 9px; }
 .hn-static { cursor: default; }
+
+/* ---------- smart tips (trip page, under each day's header) ---------- */
+.tips {
+  margin: 14px 16px 4px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface);
+  overflow: hidden; box-shadow: 0 1px 2px rgba(20, 30, 50, .04);
+}
+.tips-h {
+  all: unset; box-sizing: border-box; width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 11px 14px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.tips-h:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 14px; }
+.tips-spark { font-size: 15px; line-height: 1; }
+.tips-title { font-weight: 900; font-size: 14.5px; }
+.tips-count {
+  min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 99px; display: inline-grid; place-items: center;
+  font-size: 12px; font-weight: 700; background: var(--info-bg); color: var(--info);
+}
+.tips-count.warn { background: var(--warn-bg); color: var(--warn); }
+.tips-sub { margin-left: auto; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.tips-chev {
+  flex: 0 0 auto; width: 7px; height: 7px; margin: 0 3px 3px 6px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg); transition: transform .35s var(--spring), margin .35s var(--spring);
+}
+.tips.open .tips-chev { transform: rotate(225deg); margin-bottom: -3px; }
+.tips-body { border-top: 1px solid var(--line); padding: 6px 8px 10px; animation: fade-up .35s var(--spring) both; }
+.tips-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.tip {
+  display: grid; grid-template-columns: 34px 1fr auto; gap: 11px; align-items: start; padding: 9px 6px; border-radius: 10px;
+  animation: fade-up .4s var(--spring) both; animation-delay: calc(var(--i, 0) * 45ms);
+}
+.tip + .tip { box-shadow: 0 -1px 0 var(--line); border-radius: 0; }
+.tip-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 17px; line-height: 1; background: var(--info-bg); }
+.tip.warn .tip-ic { background: var(--warn-bg); }
+.tip.good .tip-ic { background: var(--ok-bg); }
+.tip-c { display: grid; gap: 2px; min-width: 0; padding-top: 1px; }
+.tip-t { font-weight: 700; font-size: 13.5px; line-height: 1.3; }
+.tip.warn .tip-t { color: var(--warn); }
+.tip-x { font-size: 13px; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
+.tip-hide {
+  all: unset; cursor: pointer; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px;
+  font-size: 12px; color: var(--faint); transition: background-color .2s, color .2s, opacity .2s;
+}
+.tip-hide:hover, .tip-hide:focus-visible { background: var(--surface-2); color: var(--ink); }
+/* With a mouse, the ✕ appears when you point at a tip; on touch screens it's always there. */
+@media (hover: hover) {
+  .tip .tip-hide { opacity: 0; }
+  .tip:hover .tip-hide, .tip-hide:focus-visible { opacity: 1; }
+}
+.tips-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 6px 0; font-size: 13px; }
+.tips-foot:has(> span:only-child) { display: none; }
+.tips-empty { margin: 8px 6px; font-size: 13px; color: var(--muted); }
+.tips-note { margin: 8px 6px 0; font-size: 11.5px; color: var(--faint); }
+
+/* Editor: "+ Add note" and "✨ Add suggested notes" side by side. */
+.ed-note-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.suggest-btn { border-color: color-mix(in srgb, var(--sun) 55%, var(--line)); }
+.suggest-btn:disabled { opacity: .75; cursor: progress; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin {
+  display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px;
+  border: 2px solid currentColor; border-right-color: transparent; animation: spin .7s linear infinite;
+}

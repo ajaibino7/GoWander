@@ -1,7 +1,5 @@
-// Entry point: styles, page-zoom blocking, the service worker, the update check, then the app.
-import 'leaflet/dist/leaflet.css'; // before ours, so our map styles win
-import './styles/styles.css';
-import './styles/app.css';
+// Entry point: page-zoom blocking, the service worker, the update check, then the app.
+// (The stylesheets are linked from index.html, so even the first paint is styled.)
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
