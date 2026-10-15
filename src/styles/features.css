@@ -460,9 +460,9 @@ a.smart-btn { text-decoration: none; }
 
 /* ---------- settle up ---------- */
 .settle .fine { margin-bottom: 4px; }
-.settled { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: color-mix(in srgb, var(--ok) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--ok) 25%, var(--line)); }
-.settled > span { font-size: 26px; }
-.settled > div { display: grid; gap: 2px; }
+.su-done { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: color-mix(in srgb, var(--ok) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--ok) 25%, var(--line)); }
+.su-done > span { font-size: 26px; }
+.su-done > div { display: grid; gap: 2px; }
 .su-group + .su-group { margin-top: 10px; }
 .su-h { margin: 12px 0 4px; font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .su-h.owe { color: var(--bad); }

@@ -75,7 +75,7 @@ export function SettleUp({ entry, user, list, profiles, reminders, payTo }: {
     <section className="ed-card ov-card settle">
       <h2 className="sec-h">Settle up</h2>
       {!debts.length ? (
-        <div className="settled"><span aria-hidden="true">🎉</span><div><strong>All settled up</strong><span className="muted small">Nobody owes anybody anything.</span></div></div>
+        <div className="su-done"><span aria-hidden="true">🎉</span><div><strong>All settled up</strong><span className="muted small">Nobody owes anybody anything.</span></div></div>
       ) : (
         <>
           <p className="fine">What's left to pay, person to person. Payments already made are taken off.</p>

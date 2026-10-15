@@ -384,15 +384,20 @@ html { -webkit-tap-highlight-color: transparent; }
 /* Screen transitions: the screen and header text slide as one piece. These elements stay put
    while their content is redrawn, so a redraw mid-slide doesn't restart it. The editor's save bar
    is position: fixed, so there the form's sections move instead (a moving ancestor would carry it). */
-@keyframes view-in-forward { from { opacity: 0; transform: translate3d(28px, 0, 0); } to { opacity: 1; transform: none; } }
-@keyframes view-in-back { from { opacity: 0; transform: translate3d(-28px, 0, 0); } to { opacity: 1; transform: none; } }
-@keyframes hero-in-forward { from { opacity: 0; transform: translate3d(16px, 0, 0); } to { opacity: 1; transform: none; } }
-@keyframes hero-in-back { from { opacity: 0; transform: translate3d(-16px, 0, 0); } to { opacity: 1; transform: none; } }
+/* The screen itself only slides; the fade is on the cards and text inside it. A fading parent
+   would switch off the frosted-glass blur of every card inside until the fade ended (the blur
+   would then "snap on"); a card fading by itself keeps its blur throughout. */
+@keyframes view-in-forward { from { transform: translate3d(28px, 0, 0); } to { transform: none; } }
+@keyframes view-in-back { from { transform: translate3d(-28px, 0, 0); } to { transform: none; } }
+@keyframes hero-in-forward { from { transform: translate3d(16px, 0, 0); } to { transform: none; } }
+@keyframes hero-in-back { from { transform: translate3d(-16px, 0, 0); } to { transform: none; } }
+.view:is(.enter-forward, .enter-back) :is(.ed-card, .status-card, .day, .map-card, .hub, .trip-card, .idea, .j-entry, .ed-day, .publish-bar, .tool, .empty, .tabs, .ex-tabs, .home-head, .list-h, .sec-row, .sk-card),
+.hero-inner:is(.enter-forward, .enter-back) > :not(.hero-nav) { animation: fade-in .38s ease both; }
 .view.enter-forward:not(#view-edit), #view-edit.enter-forward .editor > :not(.ed-bar) { animation: view-in-forward .48s var(--spring) both; }
 .view.enter-back:not(#view-edit), #view-edit.enter-back .editor > :not(.ed-bar) { animation: view-in-back .48s var(--spring) both; }
 .hero-inner.enter-forward { animation: hero-in-forward .46s var(--spring) both; }
 .hero-inner.enter-back { animation: hero-in-back .46s var(--spring) both; }
-.view.enter-forward, .view.enter-back, .hero-inner.enter-forward, .hero-inner.enter-back { will-change: transform, opacity; }
+.view.enter-forward, .view.enter-back, .hero-inner.enter-forward, .hero-inner.enter-back { will-change: transform; }
 /* Lists rise in once per visit — done in main.js (reveal) with the Web Animations API. */
 
 /* Placeholder cards while the trip list loads (also painted by index.html before the app starts). */
@@ -428,7 +433,7 @@ html { -webkit-tap-highlight-color: transparent; }
 /* Opening a stop eases its buttons in; the nearby panel and expanded content slide up softly. */
 @keyframes fade-up { from { opacity: 0; transform: translate3d(0, 8px, 0); } to { opacity: 1; transform: none; } }
 .stop-actions.opening, .nearby:not([hidden]) { animation: fade-up .4s var(--spring) both; }
-.samples[open] > .trip-list { animation: fade-up .45s var(--spring) both; }
+.samples[open] > .trip-list > * { animation: fade-up .45s var(--spring) both; }
 
 /* Ticking a checklist item: the box pops, the text eases to struck-through. */
 @keyframes tick { 0% { transform: scale(1); } 40% { transform: scale(1.28); } 100% { transform: scale(1); } }

@@ -91,5 +91,8 @@ const router = createHashRouter([
 });
 
 export function App() {
-  return <RouterProvider router={router} future={{ v7_startTransition: true }} />;
+  // Navigation renders straight away, not as a low-priority transition: the trip page updates
+  // live (clock, location, map) and each update would restart a transition's render of the next
+  // screen, holding a big screen like the editor back for seconds.
+  return <RouterProvider router={router} future={{ v7_startTransition: false }} />;
 }

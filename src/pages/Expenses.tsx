@@ -117,7 +117,9 @@ function ExpensesBody({ ctx, entry, user }: { ctx: TripCtx; entry: TripEntry; us
 
   return (
     <div ref={ref} style={{ display: 'contents' }}>
-      <div className="ex-tabs" role="tablist" aria-label="Expenses">
+      <div className="ex-tabs" role="tablist" aria-label="Expenses" style={{ '--i': tabs.findIndex(([t]) => t === tab) } as React.CSSProperties}>
+        {/* The highlight that slides to the chosen tab. */}
+        <span className="ex-ind" aria-hidden="true" />
         {tabs.map(([t, label]) => (
           <button key={t} type="button" role="tab" aria-selected={tab === t} className={`ex-tab${tab === t ? ' on' : ''}`} onClick={() => setTab(t)}>{label}</button>
         ))}
